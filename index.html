@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Calificaciones</title>
+  <meta name="description"
+    content="Plataforma docente minimalista de análisis y cálculo de promedios para exportaciones de calificaciones y Google Classroom.">
+
+  <!-- Geist Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+
+  <!-- SheetJS local with CDN fallback -->
+  <script src="vendor/xlsx.full.min.js"></script>
+  <script>
+    if (typeof XLSX === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"><\/script>');
+    }
+  </script>
+
+  <!-- App Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <div class="app-layout">
+    <!-- Sidebar: Group Management -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <div class="brand-logo">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <rect width="18" height="18" x="3" y="3" rx="2" />
+              <path d="M3 9h18" />
+              <path d="M9 21V9" />
+            </svg>
+          </div>
+          <span class="brand-name">Sistema de Calificaciones</span>
+
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-header">
+          <span>GRUPOS ACTIVOS</span>
+          <span class="badge-count" id="sidebarGroupCount">0</span>
+        </div>
+        <div class="groups-nav-list" id="groupsNavList">
+          <!-- Dynamically populated group items -->
+        </div>
+      </div>
+
+      <div class="sidebar-actions">
+        <button id="btnOpenUploadModal" class="btn btn-secondary btn-full"
+          title="Importar nuevo grupo desde archivo Excel o CSV">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          <span>Importar Grupo</span>
+        </button>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="storage-indicator">
+          <span class="status-dot"></span>
+          <span>Sincronizado localmente</span>
+        </div>
+        <button id="btnToggleTheme" class="btn-icon-subtle" title="Alternar tema Claro / Oscuro"
+          aria-label="Cambiar tema">
+          <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <circle cx="12" cy="12" r="4" />
+            <path
+              d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+          </svg>
+          <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+          </svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-container">
+      <!-- Top Navigation & Group Header -->
+      <header class="top-nav">
+        <div class="group-title-box">
+          <div class="group-badge-dot"></div>
+          <div>
+            <h1 class="active-group-title" id="activeGroupName">Sin grupo seleccionado</h1>
+            <div class="active-group-meta" id="activeGroupMeta">Carga un archivo .xlsx de Google Classroom para comenzar
+            </div>
+          </div>
+        </div>
+
+        <div class="top-nav-controls">
+          <!-- Missing tasks calculation toggle -->
+          <div class="setting-toggle-box" title="Alternar cómo se calculan las actividades que el alumno no entregó">
+            <label class="switch-label" for="toggleMissingAsZero">
+              <span>Tratar no entregadas como 0</span>
+              <span class="toggle-switch">
+                <input type="checkbox" id="toggleMissingAsZero" checked>
+                <span class="slider"></span>
+              </span>
+            </label>
+          </div>
+
+          <!-- Passing grade config -->
+          <div class="passing-grade-input-box" title="Calificación mínima para considerar una materia/tarea acreditada">
+            <label for="inputMinPassing">Mínimo Aprobatorio:</label>
+            <input type="number" id="inputMinPassing" min="1" max="100" step="0.5" value="6.0" class="input-compact" />
+          </div>
+
+          <div class="top-nav-actions">
+            <button id="btnExportGroup" class="btn btn-secondary btn-sm"
+              title="Exportar tabla con promedios a Excel (.xlsx)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <span>Exportar Excel</span>
+            </button>
+
+            <button id="btnDeleteCurrentGroup" class="btn btn-ghost-danger btn-sm"
+              title="Eliminar este grupo de la sesión">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Empty State Hero (when no groups exist) -->
+      <section class="empty-state-view hidden" id="emptyStateView">
+        <div class="empty-drop-card" id="emptyDropCard">
+          <input type="file" id="emptyFileInput" accept=".xlsx, .xls, .csv" class="hidden-file-input" multiple />
+          <div class="empty-icon-wrap">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+          </div>
+          <h2>Importa calificaciones de Google Classroom o Excel</h2>
+          <p>
+            Arrastra aquí tus archivos <code>.xlsx</code> o <code>.csv</code>.
+            Detecta automáticamente fechas, tareas, ignora la fila de promedio de clase y calcula las calificaciones de
+            cada alumno.
+          </p>
+          <div class="empty-cta-buttons">
+            <button class="btn btn-primary" id="btnEmptyBrowse">Seleccionar Archivos</button>
+          </div>
+          <div class="empty-hints">
+            <span>• Compatible con formato oficial Google Classroom</span>
+            <span>• Filtro inteligente de fila "Promedio de la clase"</span>
+            <span>• Soporte multi-grupo simultáneo</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Active Group Workspace -->
+      <div class="group-workspace" id="groupWorkspace">
+        <!-- Minimalist Dashboard KPIs -->
+        <section class="metrics-grid">
+          <!-- Metric 1: Group Average -->
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-title">Promedio Grupal</span>
+              <span class="metric-badge" id="kpiAvgStatus">--</span>
+            </div>
+            <div class="metric-body">
+              <span class="metric-number font-mono" id="kpiGroupAvg">0.0</span>
+            </div>
+            <div class="metric-footer" id="kpiAvgSub">Calculado con base en actividades asignadas</div>
+          </div>
+
+          <!-- Metric 2: Total Students -->
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-title">Alumnos Registrados</span>
+              <span class="metric-tag font-mono" id="kpiTaskCount">0 tareas</span>
+            </div>
+            <div class="metric-body">
+              <span class="metric-number font-mono" id="kpiTotalStudents">0</span>
+            </div>
+            <div class="metric-footer" id="kpiStudentsSub">Fila de "Promedio de clase" excluida</div>
+          </div>
+
+          <!-- Metric 3: Passing Rate -->
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-title">Aprobados vs Reprobados</span>
+              <span class="metric-badge" id="kpiPassRate">0%</span>
+            </div>
+            <div class="metric-body">
+              <div class="pass-split-row font-mono">
+                <span class="text-success"><span id="kpiPassCount">0</span> apr.</span>
+                <span class="split-divider">/</span>
+                <span class="text-danger"><span id="kpiFailCount">0</span> rep.</span>
+              </div>
+            </div>
+            <div class="metric-footer">
+              <div class="metric-progress-track">
+                <div class="metric-progress-fill" id="kpiPassProgress" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Metric 4: Assignment Performance -->
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-title">Desempeño de Actividades</span>
+            </div>
+            <div class="task-perf-list">
+              <div class="task-perf-item">
+                <span class="perf-label text-success">▲ Mayor:</span>
+                <span class="perf-name" id="kpiBestTask">-</span>
+                <span class="perf-score font-mono text-success" id="kpiBestScore">--</span>
+              </div>
+              <div class="task-perf-item">
+                <span class="perf-label text-danger">▼ Menor:</span>
+                <span class="perf-name" id="kpiWorstTask">-</span>
+                <span class="perf-score font-mono text-danger" id="kpiWorstScore">--</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Controls Toolbar -->
+        <section class="toolbar-section">
+          <!-- Search box -->
+          <div class="search-input-wrapper">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input type="text" id="tableSearchInput" placeholder="Filtrar por apellidos o nombres..." />
+            <kbd class="search-kbd">/</kbd>
+          </div>
+
+          <!-- Sort Button Group -->
+          <div class="sort-controls-group">
+            <span class="toolbar-caption">Ordenar:</span>
+            <button class="btn btn-pill active" id="btnSortNameAsc" title="Alfabéticamente por Apellidos (A-Z)">
+              Apellidos A → Z
+            </button>
+            <button class="btn btn-pill" id="btnSortNameDesc" title="Alfabéticamente por Apellidos (Z-A)">
+              Apellidos Z → A
+            </button>
+            <button class="btn btn-pill" id="btnSortAvgDesc" title="Promedio de mayor a menor">
+              Mayor Promedio
+            </button>
+            <button class="btn btn-pill" id="btnSortAvgAsc" title="Promedio de menor a mayor">
+              Menor Promedio
+            </button>
+          </div>
+
+          <!-- Status Filter Tabs -->
+          <div class="filter-tabs-group">
+            <button class="filter-tab active" data-filter="all">Todos (<span id="countAll">0</span>)</button>
+            <button class="filter-tab" data-filter="passed">Aprobados (<span id="countPassed">0</span>)</button>
+            <button class="filter-tab" data-filter="failed">Reprobados (<span id="countFailed">0</span>)</button>
+          </div>
+        </section>
+
+        <!-- Minimalist Table Container -->
+        <section class="table-container">
+          <div class="table-scroll-wrapper">
+            <table class="grades-table" id="gradesTable">
+              <thead>
+                <!-- Row 1: Dates (Google Classroom Row 1) -->
+                <tr class="header-dates-row" id="theadDatesRow">
+                  <th class="col-pinned col-idx">#</th>
+                  <th class="col-pinned col-student">FECHA DE ENTREGA:</th>
+                  <!-- Dynamic assignment date headers -->
+                  <th class="col-pinned-right col-avg">MÉTRICAS</th>
+                  <th class="col-pinned-right col-status">ESTADO</th>
+                </tr>
+
+                <!-- Row 2: Assignment Names (Google Classroom Row 2) -->
+                <tr class="header-tasks-row" id="theadTasksRow">
+                  <th class="col-pinned col-idx">#</th>
+                  <th class="col-pinned col-student sortable" id="thStudentName">
+                    <span>Alumno (Apellidos y Nombres)</span>
+                    <span class="sort-indicator" id="nameSortIndicator">▲</span>
+                  </th>
+                  <!-- Dynamic assignment title headers -->
+                  <th class="col-pinned-right col-avg sortable" id="thStudentAvg">
+                    <span>Promedio</span>
+                    <span class="sort-indicator" id="avgSortIndicator">⇅</span>
+                  </th>
+                  <th class="col-pinned-right col-status">
+                    <span>Condición</span>
+                  </th>
+                </tr>
+
+                <!-- Row 3: Assignment Class Averages Summary Row -->
+                <tr class="header-summary-row" id="theadSummaryRow">
+                  <th class="col-pinned col-idx">Σ</th>
+                  <th class="col-pinned col-student text-muted">Promedio por Tarea</th>
+                  <!-- Dynamic task averages -->
+                  <th class="col-pinned-right col-avg font-mono" id="thSummaryGroupAvg">0.0</th>
+                  <th class="col-pinned-right col-status text-muted">-</th>
+                </tr>
+              </thead>
+              <tbody id="gradesTableBody">
+                <!-- Dynamically rendered student rows -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Empty search results notice -->
+          <div class="table-search-empty hidden" id="tableSearchEmpty">
+            <p>No se encontraron alumnos que coincidan con la búsqueda.</p>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- Upload Modal Dialog -->
+  <div class="modal-backdrop hidden" id="uploadModal">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h3 class="modal-title">Importar Hoja de Calificaciones</h3>
+        <button class="btn-close-modal" id="btnCloseUploadModal" aria-label="Cerrar">✕</button>
+      </div>
+
+      <div class="modal-content">
+        <div class="modal-field">
+          <label for="inputCustomGroupName">Nombre del Grupo / Materia (opcional):</label>
+          <input type="text" id="inputCustomGroupName" placeholder="Ej. 3APr — Emplea Frameworks" class="input-text" />
+          <span class="field-hint">Si lo dejas vacío, se usará el nombre del archivo.</span>
+        </div>
+
+        <div class="modal-drop-zone" id="modalDropZone">
+          <input type="file" id="modalFileInput" accept=".xlsx, .xls, .csv" class="hidden-file-input" />
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="12" y1="18" x2="12" y2="12" />
+            <line x1="9" y1="15" x2="15" y2="15" />
+          </svg>
+          <p>Arrastra aquí tu archivo <strong>.xlsx</strong> o <strong>.csv</strong></p>
+          <button type="button" class="btn btn-secondary btn-sm" id="btnModalBrowse">Examinar Archivo</button>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn btn-ghost" id="btnCancelUpload">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+
+  <!-- Application Logic -->
+  <script src="app.js"></script>
+</body>
+
+</html>
