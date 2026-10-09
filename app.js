@@ -52,10 +52,6 @@
     kpiPassCount: document.getElementById('kpiPassCount'),
     kpiFailCount: document.getElementById('kpiFailCount'),
     kpiPassProgress: document.getElementById('kpiPassProgress'),
-    kpiBestTask: document.getElementById('kpiBestTask'),
-    kpiBestScore: document.getElementById('kpiBestScore'),
-    kpiWorstTask: document.getElementById('kpiWorstTask'),
-    kpiWorstScore: document.getElementById('kpiWorstScore'),
 
     // Toolbar
     tableSearchInput: document.getElementById('tableSearchInput'),
@@ -70,8 +66,6 @@
     // Table
     theadDatesRow: document.getElementById('theadDatesRow'),
     theadTasksRow: document.getElementById('theadTasksRow'),
-    theadSummaryRow: document.getElementById('theadSummaryRow'),
-    thSummaryGroupAvg: document.getElementById('thSummaryGroupAvg'),
     thStudentName: document.getElementById('thStudentName'),
     thStudentAvg: document.getElementById('thStudentAvg'),
     nameSortIndicator: document.getElementById('nameSortIndicator'),
@@ -378,46 +372,6 @@
     el.kpiPassCount.textContent = passedCount;
     el.kpiFailCount.textContent = failedCount;
     el.kpiPassProgress.style.width = `${passRate}%`;
-
-    // Task performance (Highest / Lowest average task)
-    let bestTask = null, bestScore = -1;
-    let worstTask = null, worstScore = 9999;
-
-    group.tasks.forEach(t => {
-      let taskSum = 0;
-      let taskCount = 0;
-      group.students.forEach(s => {
-        const val = s.grades[t.id];
-        if (val !== null) {
-          taskSum += val;
-          taskCount++;
-        } else if (treatAsZero) {
-          taskCount++;
-        }
-      });
-
-      const tAvg = taskCount > 0 ? (taskSum / taskCount) : 0;
-      if (tAvg > bestScore) {
-        bestScore = tAvg;
-        bestTask = t.name;
-      }
-      if (tAvg < worstScore) {
-        worstScore = tAvg;
-        worstTask = t.name;
-      }
-    });
-
-    if (group.tasks.length > 0) {
-      el.kpiBestTask.textContent = bestTask || '-';
-      el.kpiBestScore.textContent = (Math.round(bestScore * 10) / 10).toFixed(1);
-      el.kpiWorstTask.textContent = worstTask || '-';
-      el.kpiWorstScore.textContent = (Math.round(worstScore * 10) / 10).toFixed(1);
-    } else {
-      el.kpiBestTask.textContent = '-';
-      el.kpiBestScore.textContent = '--';
-      el.kpiWorstTask.textContent = '-';
-      el.kpiWorstScore.textContent = '--';
-    }
   }
 
   /* ==========================================================================
@@ -430,7 +384,7 @@
     const treatAsZero = state.settings.treatMissingAsZero;
     const minPass = state.settings.minPassingGrade;
 
-    // 1. Rebuild Headers (Dates Row, Tasks Row, Summary Row)
+    // 1. Rebuild Headers (Dates Row & Tasks Row)
     // Clear dynamic columns between student col and metrics col
     el.theadDatesRow.innerHTML = `
       <th class="col-pinned col-idx">#</th>
@@ -443,29 +397,9 @@
         <span class="sort-indicator" id="nameSortIndicator">${state.currentSort.startsWith('name') ? (state.currentSort === 'name_asc' ? '▲' : '▼') : '⇅'}</span>
       </th>
     `;
-    el.theadSummaryRow.innerHTML = `
-      <th class="col-pinned col-idx">Σ</th>
-      <th class="col-pinned col-student text-muted">Promedio por Tarea</th>
-    `;
-
-    // Compute task averages for summary row
-    const taskAverages = {};
-    group.tasks.forEach(t => {
-      let sum = 0, count = 0;
-      group.students.forEach(s => {
-        const val = s.grades[t.id];
-        if (val !== null) {
-          sum += val;
-          count++;
-        } else if (treatAsZero) {
-          count++;
-        }
-      });
-      taskAverages[t.id] = count > 0 ? (sum / count) : 0;
-    });
 
     // Append dynamic task columns
-    group.tasks.forEach((t, idx) => {
+    group.tasks.forEach((t) => {
       // Date row
       const thDate = document.createElement('th');
       thDate.className = 'font-mono';
@@ -477,12 +411,6 @@
       thTask.title = t.name;
       thTask.textContent = t.name;
       el.theadTasksRow.appendChild(thTask);
-
-      // Summary row
-      const thSummary = document.createElement('th');
-      thSummary.className = 'font-mono';
-      thSummary.textContent = (Math.round(taskAverages[t.id] * 10) / 10).toFixed(1);
-      el.theadSummaryRow.appendChild(thSummary);
     });
 
     // Pinned Right Columns (Metrics & Condition)
@@ -505,15 +433,6 @@
       <th class="col-pinned-right col-status">
         <span>Condición</span>
       </th>
-    `);
-
-    // Group average in summary row
-    const totalAvgs = group.students.map(s => computeStudentAverage(s, group.tasks, treatAsZero));
-    const overallAvg = totalAvgs.length > 0 ? (totalAvgs.reduce((a, b) => a + b, 0) / totalAvgs.length) : 0;
-
-    appendPinnedRight(el.theadSummaryRow, `
-      <th class="col-pinned-right col-avg font-mono" id="thSummaryGroupAvg">${(Math.round(overallAvg * 10) / 10).toFixed(1)}</th>
-      <th class="col-pinned-right col-status text-muted">-</th>
     `);
 
     // Attach click sorting to dynamically rebuilt headers

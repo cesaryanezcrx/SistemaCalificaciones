@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sistema de Calificaciones</title>
+  <title>Sistema de Calificaciones - Cesar Yañez</title>
   <meta name="description"
     content="Plataforma docente minimalista de análisis y cálculo de promedios para exportaciones de calificaciones y Google Classroom.">
 
@@ -214,25 +214,6 @@
               </div>
             </div>
           </div>
-
-          <!-- Metric 4: Assignment Performance -->
-          <div class="metric-card">
-            <div class="metric-header">
-              <span class="metric-title">Desempeño de Actividades</span>
-            </div>
-            <div class="task-perf-list">
-              <div class="task-perf-item">
-                <span class="perf-label text-success">▲ Mayor:</span>
-                <span class="perf-name" id="kpiBestTask">-</span>
-                <span class="perf-score font-mono text-success" id="kpiBestScore">--</span>
-              </div>
-              <div class="task-perf-item">
-                <span class="perf-label text-danger">▼ Menor:</span>
-                <span class="perf-name" id="kpiWorstTask">-</span>
-                <span class="perf-score font-mono text-danger" id="kpiWorstScore">--</span>
-              </div>
-            </div>
-          </div>
         </section>
 
         <!-- Controls Toolbar -->
@@ -301,15 +282,6 @@
                   <th class="col-pinned-right col-status">
                     <span>Condición</span>
                   </th>
-                </tr>
-
-                <!-- Row 3: Assignment Class Averages Summary Row -->
-                <tr class="header-summary-row" id="theadSummaryRow">
-                  <th class="col-pinned col-idx">Σ</th>
-                  <th class="col-pinned col-student text-muted">Promedio por Tarea</th>
-                  <!-- Dynamic task averages -->
-                  <th class="col-pinned-right col-avg font-mono" id="thSummaryGroupAvg">0.0</th>
-                  <th class="col-pinned-right col-status text-muted">-</th>
                 </tr>
               </thead>
               <tbody id="gradesTableBody">
