@@ -614,7 +614,7 @@ input:checked + .slider:before {
 /* Metrics Grid (Geist KPI Cards) */
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
   gap: 1rem;
 }
 
@@ -693,11 +693,6 @@ input:checked + .slider:before {
   font-weight: 600;
 }
 
-.split-divider {
-  color: var(--text-tertiary);
-  font-weight: 300;
-}
-
 .metric-footer {
   font-size: 0.725rem;
   color: var(--text-tertiary);
@@ -719,38 +714,10 @@ input:checked + .slider:before {
   transition: width 0.4s ease;
 }
 
-.task-perf-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  margin-top: 0.2rem;
-}
-
-.task-perf-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  font-size: 0.75rem;
-}
-
-.perf-label {
-  font-weight: 600;
-  width: 55px;
-  flex-shrink: 0;
-}
-
-.perf-name {
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
-}
-
-.perf-score {
-  font-weight: 600;
-  flex-shrink: 0;
+.metric-subtext {
+  margin-top: 0.35rem;
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
 }
 
 /* ==========================================================================

@@ -48,10 +48,17 @@
     kpiAvgSub: document.getElementById('kpiAvgSub'),
     kpiTotalStudents: document.getElementById('kpiTotalStudents'),
     kpiTaskCount: document.getElementById('kpiTaskCount'),
-    kpiPassRate: document.getElementById('kpiPassRate'),
+    kpiPassRateNumber: document.getElementById('kpiPassRateNumber'),
+    kpiPassRateBadge: document.getElementById('kpiPassRateBadge'),
+    kpiPassRateFill: document.getElementById('kpiPassRateFill'),
+    kpiPassRateSub: document.getElementById('kpiPassRateSub'),
+    kpiMinPassTag: document.getElementById('kpiMinPassTag'),
     kpiPassCount: document.getElementById('kpiPassCount'),
     kpiFailCount: document.getElementById('kpiFailCount'),
-    kpiPassProgress: document.getElementById('kpiPassProgress'),
+    kpiPassSplitSub: document.getElementById('kpiPassSplitSub'),
+    kpiZeroCount: document.getElementById('kpiZeroCount'),
+    kpiZeroBadge: document.getElementById('kpiZeroBadge'),
+    kpiZeroSub: document.getElementById('kpiZeroSub'),
 
     // Toolbar
     tableSearchInput: document.getElementById('tableSearchInput'),
@@ -62,6 +69,7 @@
     countAll: document.getElementById('countAll'),
     countPassed: document.getElementById('countPassed'),
     countFailed: document.getElementById('countFailed'),
+    countZero: document.getElementById('countZero'),
 
     // Table
     theadDatesRow: document.getElementById('theadDatesRow'),
@@ -366,12 +374,52 @@
     // Passing vs Failing
     const passedCount = studentAvgs.filter(avg => avg >= minPass).length;
     const failedCount = totalStudents - passedCount;
-    const passRate = totalStudents > 0 ? Math.round((passedCount / totalStudents) * 100) : 0;
+    const passRate = totalStudents > 0 ? (Math.round((passedCount / totalStudents) * 1000) / 10) : 0;
+    const passRateDisplay = passRate % 1 === 0 ? `${passRate}%` : `${passRate.toFixed(1)}%`;
 
-    el.kpiPassRate.textContent = `${passRate}%`;
-    el.kpiPassCount.textContent = passedCount;
-    el.kpiFailCount.textContent = failedCount;
-    el.kpiPassProgress.style.width = `${passRate}%`;
+    // Porcentaje de Aprobación KPI
+    if (el.kpiPassRateNumber) el.kpiPassRateNumber.textContent = passRateDisplay;
+    if (el.kpiPassRateBadge) {
+      if (passRate >= 70) {
+        el.kpiPassRateBadge.textContent = 'Aprobatorio';
+        el.kpiPassRateBadge.className = 'metric-badge badge-success';
+      } else if (passRate >= 60) {
+        el.kpiPassRateBadge.textContent = 'Regular';
+        el.kpiPassRateBadge.className = 'metric-badge';
+      } else {
+        el.kpiPassRateBadge.textContent = 'En Riesgo';
+        el.kpiPassRateBadge.className = 'metric-badge badge-danger';
+      }
+    }
+    if (el.kpiPassRateFill) el.kpiPassRateFill.style.width = `${Math.min(100, Math.max(0, passRate))}%`;
+    if (el.kpiPassRateSub) el.kpiPassRateSub.textContent = `${passedCount} de ${totalStudents} acreditados`;
+
+    // Aprobados vs Reprobados Split
+    if (el.kpiMinPassTag) el.kpiMinPassTag.textContent = `Mín. ${minPass.toFixed(1)}`;
+    if (el.kpiPassCount) el.kpiPassCount.textContent = passedCount;
+    if (el.kpiFailCount) el.kpiFailCount.textContent = failedCount;
+    if (el.kpiPassSplitSub) el.kpiPassSplitSub.textContent = `${failedCount} alumno${failedCount === 1 ? '' : 's'} por regularizar`;
+
+    // Alumnos con Promedio 0 KPI
+    const zeroCount = studentAvgs.filter(avg => avg === 0).length;
+    const zeroRate = totalStudents > 0 ? (Math.round((zeroCount / totalStudents) * 1000) / 10) : 0;
+    const zeroRateDisplay = zeroRate % 1 === 0 ? `${zeroRate}%` : `${zeroRate.toFixed(1)}%`;
+
+    if (el.kpiZeroCount) el.kpiZeroCount.textContent = zeroCount;
+    if (el.kpiZeroBadge) {
+      if (zeroCount === 0) {
+        el.kpiZeroBadge.textContent = '0%';
+        el.kpiZeroBadge.className = 'metric-badge badge-success';
+      } else {
+        el.kpiZeroBadge.textContent = `${zeroRateDisplay} del grupo`;
+        el.kpiZeroBadge.className = 'metric-badge badge-danger';
+      }
+    }
+    if (el.kpiZeroSub) {
+      el.kpiZeroSub.textContent = zeroCount === 0 
+        ? 'Ningún alumno con promedio 0.0' 
+        : `${zeroCount} alumno${zeroCount > 1 ? 's' : ''} sin entregas o calif. 0.0`;
+    }
   }
 
   /* ==========================================================================
@@ -460,6 +508,8 @@
       list = list.filter(s => computeStudentAverage(s, group.tasks, treatAsZero) >= minPass);
     } else if (state.currentFilter === 'failed') {
       list = list.filter(s => computeStudentAverage(s, group.tasks, treatAsZero) < minPass);
+    } else if (state.currentFilter === 'zero') {
+      list = list.filter(s => computeStudentAverage(s, group.tasks, treatAsZero) === 0);
     }
 
     // Sorting
@@ -487,6 +537,9 @@
     el.countAll.textContent = allStudents.length;
     el.countPassed.textContent = allStudents.filter(s => computeStudentAverage(s, group.tasks, treatAsZero) >= minPass).length;
     el.countFailed.textContent = allStudents.filter(s => computeStudentAverage(s, group.tasks, treatAsZero) < minPass).length;
+    if (el.countZero) {
+      el.countZero.textContent = allStudents.filter(s => computeStudentAverage(s, group.tasks, treatAsZero) === 0).length;
+    }
 
     // 3. Render Body Rows
     el.gradesTableBody.innerHTML = '';

@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sistema de Calificaciones - Cesar Yañez</title>
+  <title>Sistema de Calificaciones</title>
   <meta name="description"
     content="Plataforma docente minimalista de análisis y cálculo de promedios para exportaciones de calificaciones y Google Classroom.">
 
@@ -195,11 +195,28 @@
             <div class="metric-footer" id="kpiStudentsSub">Fila de "Promedio de clase" excluida</div>
           </div>
 
-          <!-- Metric 3: Passing Rate -->
+          <!-- Metric 3: Passing Percentage -->
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-title">Porcentaje de Aprobación</span>
+              <span class="metric-badge" id="kpiPassRateBadge">--</span>
+            </div>
+            <div class="metric-body">
+              <span class="metric-number font-mono" id="kpiPassRateNumber">0%</span>
+            </div>
+            <div class="metric-footer">
+              <div class="metric-progress-track">
+                <div class="metric-progress-fill" id="kpiPassRateFill" style="width: 0%"></div>
+              </div>
+              <div class="metric-subtext" id="kpiPassRateSub">0 de 0 acreditados</div>
+            </div>
+          </div>
+
+          <!-- Metric 4: Passed vs Failed Split -->
           <div class="metric-card">
             <div class="metric-header">
               <span class="metric-title">Aprobados vs Reprobados</span>
-              <span class="metric-badge" id="kpiPassRate">0%</span>
+              <span class="metric-tag font-mono" id="kpiMinPassTag">Mín. 6.0</span>
             </div>
             <div class="metric-body">
               <div class="pass-split-row font-mono">
@@ -208,11 +225,19 @@
                 <span class="text-danger"><span id="kpiFailCount">0</span> rep.</span>
               </div>
             </div>
-            <div class="metric-footer">
-              <div class="metric-progress-track">
-                <div class="metric-progress-fill" id="kpiPassProgress" style="width: 0%"></div>
-              </div>
+            <div class="metric-footer" id="kpiPassSplitSub">0 alumnos por regularizar</div>
+          </div>
+
+          <!-- Metric 5: Zero Average Students -->
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-title">Alumnos con Promedio 0</span>
+              <span class="metric-badge" id="kpiZeroBadge">0%</span>
             </div>
+            <div class="metric-body">
+              <span class="metric-number font-mono" id="kpiZeroCount">0</span>
+            </div>
+            <div class="metric-footer" id="kpiZeroSub">Sin entregas o con promedio 0.0</div>
           </div>
         </section>
 
@@ -250,6 +275,7 @@
             <button class="filter-tab active" data-filter="all">Todos (<span id="countAll">0</span>)</button>
             <button class="filter-tab" data-filter="passed">Aprobados (<span id="countPassed">0</span>)</button>
             <button class="filter-tab" data-filter="failed">Reprobados (<span id="countFailed">0</span>)</button>
+            <button class="filter-tab" data-filter="zero">Promedio 0 (<span id="countZero">0</span>)</button>
           </div>
         </section>
 
