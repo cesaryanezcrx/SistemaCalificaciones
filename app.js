@@ -580,7 +580,7 @@
         </td>
         <td class="col-pinned-right col-status">
           <span class="badge-status ${isPassed ? 'badge-status-pass' : 'badge-status-fail'}">
-            ${isPassed ? 'Acreditado' : 'Reprobado'}
+            ${isPassed ? 'Aprobado' : 'Reprobado'}
           </span>
         </td>
       `;
@@ -860,7 +860,7 @@
         studentRow.push(val !== null ? val : (treatAsZero ? 0 : ''));
       });
       studentRow.push(avg);
-      studentRow.push(avg >= minPass ? 'Acreditado' : 'Reprobado');
+      studentRow.push(avg >= minPass ? 'Aprobado' : 'Reprobado');
       rows.push(studentRow);
     });
 
