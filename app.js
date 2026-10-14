@@ -24,6 +24,8 @@
     // Sidebar
     sidebarGroupCount: document.getElementById('sidebarGroupCount'),
     groupsNavList: document.getElementById('groupsNavList'),
+    btnClearAllGroups: document.getElementById('btnClearAllGroups'),
+    btnClearAllGroupsHeader: document.getElementById('btnClearAllGroupsHeader'),
     btnOpenUploadModal: document.getElementById('btnOpenUploadModal'),
     btnToggleTheme: document.getElementById('btnToggleTheme'),
 
@@ -339,8 +341,13 @@
       el.groupWorkspace.classList.add('hidden');
       el.activeGroupName.textContent = 'Sin grupo seleccionado';
       el.activeGroupMeta.textContent = 'Carga un archivo .xlsx para comenzar';
+      if (el.btnExportGroup) el.btnExportGroup.disabled = true;
+      if (el.btnDeleteCurrentGroup) el.btnDeleteCurrentGroup.disabled = true;
       return;
     }
+
+    if (el.btnExportGroup) el.btnExportGroup.disabled = false;
+    if (el.btnDeleteCurrentGroup) el.btnDeleteCurrentGroup.disabled = false;
 
     el.emptyStateView.classList.add('hidden');
     el.groupWorkspace.classList.remove('hidden');
@@ -427,7 +434,12 @@
      ========================================================================== */
   function renderTable() {
     const group = getActiveGroup();
-    if (!group) return;
+    if (!group) {
+      el.theadDatesRow.innerHTML = '';
+      el.theadTasksRow.innerHTML = '';
+      el.gradesTableBody.innerHTML = '';
+      return;
+    }
 
     const treatAsZero = state.settings.treatMissingAsZero;
     const minPass = state.settings.minPassingGrade;
@@ -599,20 +611,43 @@
      Sidebar & Multi-Group Navigation
      ========================================================================== */
   function renderSidebar() {
-    el.sidebarGroupCount.textContent = state.groups.length;
+    const totalGroups = state.groups.length;
+    el.sidebarGroupCount.textContent = totalGroups;
     el.groupsNavList.innerHTML = '';
+
+    if (el.btnClearAllGroups) {
+      el.btnClearAllGroups.disabled = totalGroups === 0;
+    }
+    if (el.btnClearAllGroupsHeader) {
+      el.btnClearAllGroupsHeader.style.display = totalGroups === 0 ? 'none' : 'inline-flex';
+    }
 
     state.groups.forEach(group => {
       const item = document.createElement('div');
       item.className = `nav-group-item ${group.id === state.activeGroupId ? 'active' : ''}`;
       item.innerHTML = `
-        <span class="group-item-name" title="${escapeHtml(group.name)}">${escapeHtml(group.name)}</span>
-        <span class="group-item-count">${group.students.length} al.</span>
+        <div class="nav-group-item-content">
+          <span class="group-item-name" title="${escapeHtml(group.name)}">${escapeHtml(group.name)}</span>
+          <span class="group-item-count">${group.students.length} al.</span>
+        </div>
+        <button type="button" class="btn-group-item-delete" title="Eliminar grupo &quot;${escapeHtml(group.name)}&quot;" aria-label="Eliminar grupo">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12"/>
+          </svg>
+        </button>
       `;
 
       item.addEventListener('click', () => {
         selectGroup(group.id);
       });
+
+      const btnDelete = item.querySelector('.btn-group-item-delete');
+      if (btnDelete) {
+        btnDelete.addEventListener('click', (e) => {
+          e.stopPropagation();
+          deleteGroupById(group.id);
+        });
+      }
 
       el.groupsNavList.appendChild(item);
     });
@@ -628,19 +663,51 @@
     renderTable();
   }
 
-  function deleteCurrentGroup() {
-    if (!state.activeGroupId) return;
-    const group = getActiveGroup();
+  function deleteGroupById(groupId) {
+    const group = state.groups.find(g => g.id === groupId);
+    if (!group) return;
     if (!confirm(`¿Eliminar el grupo "${group.name}"?`)) return;
 
-    state.groups = state.groups.filter(g => g.id !== state.activeGroupId);
-    state.activeGroupId = state.groups.length > 0 ? state.groups[0].id : null;
+    state.groups = state.groups.filter(g => g.id !== groupId);
+    if (state.activeGroupId === groupId) {
+      state.activeGroupId = state.groups.length > 0 ? state.groups[0].id : null;
+    }
 
     persistState();
     renderSidebar();
     updateDashboard();
     renderTable();
-    showToast('Grupo eliminado');
+    showToast(`Grupo "${group.name}" eliminado`);
+  }
+
+  function deleteCurrentGroup() {
+    if (!state.activeGroupId) return;
+    deleteGroupById(state.activeGroupId);
+  }
+
+  function clearAllGroups() {
+    if (!state.groups || state.groups.length === 0) {
+      showToast('No hay grupos activos para limpiar');
+      return;
+    }
+
+    const count = state.groups.length;
+    const msg = count === 1
+      ? '¿Estás seguro de que deseas limpiar el grupo activo? Se eliminará de la sesión.'
+      : `¿Estás seguro de que deseas limpiar todos los ${count} grupos activos? Se eliminarán de la sesión actual.`;
+
+    if (!confirm(msg)) return;
+
+    state.groups = [];
+    state.activeGroupId = null;
+    state.searchQuery = '';
+    if (el.tableSearchInput) el.tableSearchInput.value = '';
+
+    persistState();
+    renderSidebar();
+    updateDashboard();
+    renderTable();
+    showToast(count === 1 ? 'Grupo activo eliminado' : 'Grupos activos limpiados correctamente');
   }
 
   /* ==========================================================================
@@ -709,6 +776,10 @@
 
     // Delete Group Button
     el.btnDeleteCurrentGroup.addEventListener('click', deleteCurrentGroup);
+
+    // Clear all groups buttons
+    if (el.btnClearAllGroups) el.btnClearAllGroups.addEventListener('click', clearAllGroups);
+    if (el.btnClearAllGroupsHeader) el.btnClearAllGroupsHeader.addEventListener('click', clearAllGroups);
 
     // Export button
     el.btnExportGroup.addEventListener('click', exportActiveGroupToExcel);

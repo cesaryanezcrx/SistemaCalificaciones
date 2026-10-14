@@ -194,6 +194,34 @@ body {
   color: var(--text-tertiary);
 }
 
+.sidebar-header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.btn-clear-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.68rem;
+  font-family: inherit;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  transition: all var(--trans-fast);
+}
+
+.btn-clear-header:hover {
+  color: var(--status-fail-text);
+  background-color: var(--status-fail-bg);
+  border-color: var(--status-fail-border);
+}
+
 .badge-count {
   font-family: var(--font-mono);
   font-size: 0.7rem;
@@ -210,7 +238,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.55rem 0.75rem;
+  padding: 0.5rem 0.5rem 0.5rem 0.75rem;
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-size: 0.825rem;
@@ -219,6 +247,7 @@ body {
   border: 1px solid transparent;
   transition: all var(--trans-fast);
   user-select: none;
+  gap: 0.4rem;
 }
 
 .nav-group-item:hover {
@@ -233,17 +262,52 @@ body {
   font-weight: 600;
 }
 
+.nav-group-item-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  min-width: 0;
+  gap: 0.4rem;
+}
+
+.btn-group-item-delete {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: var(--radius-xs);
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all var(--trans-fast);
+  flex-shrink: 0;
+}
+
+.nav-group-item:hover .btn-group-item-delete {
+  display: inline-flex;
+}
+
+.btn-group-item-delete:hover {
+  background-color: var(--status-fail-bg);
+  color: var(--status-fail-text);
+}
+
 .group-item-name {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 170px;
+  max-width: 155px;
 }
 
 .group-item-count {
   font-family: var(--font-mono);
   font-size: 0.7rem;
   color: var(--text-tertiary);
+  flex-shrink: 0;
 }
 
 .sidebar-actions {
@@ -346,6 +410,13 @@ body {
 
 .btn-full {
   width: 100%;
+}
+
+.btn:disabled,
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .btn-sm {
