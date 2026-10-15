@@ -27,7 +27,6 @@
     btnClearAllGroups: document.getElementById('btnClearAllGroups'),
     btnClearAllGroupsHeader: document.getElementById('btnClearAllGroupsHeader'),
     btnOpenUploadModal: document.getElementById('btnOpenUploadModal'),
-    btnToggleTheme: document.getElementById('btnToggleTheme'),
 
     // Top Nav
     activeGroupName: document.getElementById('activeGroupName'),
@@ -151,19 +150,11 @@
   }
 
   /* ==========================================================================
-     Theme Management (Geist Light/Dark)
+     Theme Management (Solo Tema Blanco)
      ========================================================================== */
   function initTheme() {
-    const savedTheme = localStorage.getItem('gradeflow_theme') || 'dark';
-    document.documentElement.setAttribute('data-theme', savedTheme);
-
-    el.btnToggleTheme.addEventListener('click', () => {
-      const current = document.documentElement.getAttribute('data-theme');
-      const next = current === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      localStorage.setItem('gradeflow_theme', next);
-      showToast(`Tema cambiado a ${next === 'dark' ? 'Oscuro' : 'Claro'}`);
-    });
+    document.documentElement.setAttribute('data-theme', 'light');
+    localStorage.removeItem('gradeflow_theme');
   }
 
   function showToast(message, duration = 3000) {

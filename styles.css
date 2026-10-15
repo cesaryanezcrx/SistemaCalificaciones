@@ -3,49 +3,9 @@
    Aesthetics: Strict Grayscale, Subtle Borders, Tabular Numbers, Generous Space
    ========================================================================== */
 
-:root {
-  /* Dark Mode Default (Vercel True Black) */
-  --bg-page: #000000;
-  --bg-sidebar: #050505;
-  --bg-card: #0a0a0a;
-  --bg-card-hover: #121212;
-  --bg-subtle: #141414;
-  --bg-input: #0e0e0e;
-  
-  --border-subtle: #222222;
-  --border-strong: #333333;
-  --border-focus: #555555;
-  
-  --text-primary: #f5f5f5;
-  --text-secondary: #888888;
-  --text-tertiary: #525252;
-  --text-inverse: #000000;
-  
-  --accent-button-bg: #ffffff;
-  --accent-button-text: #000000;
-  
-  --status-pass-text: #4ade80;
-  --status-pass-bg: rgba(74, 222, 128, 0.08);
-  --status-pass-border: rgba(74, 222, 128, 0.2);
-
-  --status-fail-text: #f87171;
-  --status-fail-bg: rgba(248, 113, 113, 0.08);
-  --status-fail-border: rgba(248, 113, 113, 0.2);
-
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-pill: 9999px;
-
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
-  
-  --trans-fast: 0.15s ease;
-  --trans-normal: 0.2s ease;
-}
-
+:root,
 [data-theme="light"] {
+  /* Light Theme Default (Minimalista Blanco) */
   --bg-page: #ffffff;
   --bg-sidebar: #fbfbfb;
   --bg-card: #ffffff;
@@ -72,6 +32,18 @@
   --status-fail-text: #b91c1c;
   --status-fail-bg: rgba(185, 28, 28, 0.08);
   --status-fail-border: rgba(185, 28, 28, 0.2);
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 9999px;
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  
+  --trans-fast: 0.15s ease;
+  --trans-normal: 0.2s ease;
 }
 
 /* ==========================================================================
@@ -441,10 +413,7 @@ button:disabled {
   color: var(--text-primary);
 }
 
-[data-theme="dark"] .icon-sun { display: block; }
-[data-theme="dark"] .icon-moon { display: none; }
-[data-theme="light"] .icon-sun { display: none; }
-[data-theme="light"] .icon-moon { display: block; }
+
 
 /* Geist Toggle Switch */
 .switch-label {
