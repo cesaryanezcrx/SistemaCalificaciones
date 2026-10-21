@@ -302,6 +302,25 @@
   /* ==========================================================================
      Calculations & Averages
      ========================================================================== */
+  function roundAverage(val) {
+    if (val === null || val === undefined || isNaN(val) || val <= 0) return 0;
+    if (val >= 10) return 10;
+
+    const integerPart = Math.floor(val);
+    // Evita problemas de precisión de punto flotante en JS (ej. 7.6 - 7 = 0.5999999999999996)
+    const decimalPart = Math.round((val - integerPart) * 10000) / 10000;
+
+    // Regla: si el decimal es >= 0.6 redondea hacia arriba, si es menor redondea hacia abajo
+    let rounded = decimalPart >= 0.6 ? integerPart + 1 : integerPart;
+
+    // Norma oficial DGETI / CBTis: calificaciones menores a 6.0 no suben a aprobatoria (5.0 a 5.9 queda en 5)
+    if (val < 6.0 && rounded >= 6) {
+      rounded = 5;
+    }
+
+    return Math.min(10, Math.max(0, rounded));
+  }
+
   function computeStudentAverage(student, tasks, treatAsZero) {
     let sum = 0;
     let count = 0;
@@ -318,7 +337,7 @@
     });
 
     if (count === 0) return 0;
-    return Math.round((sum / count) * 10) / 10;
+    return roundAverage(sum / count);
   }
 
   function getActiveGroup() {
@@ -359,7 +378,7 @@
 
     el.kpiGroupAvg.textContent = roundedGroupAvg.toFixed(1);
     if (roundedGroupAvg >= minPass) {
-      el.kpiAvgStatus.textContent = 'Acreditado';
+      el.kpiAvgStatus.textContent = 'Aprobado';
       el.kpiAvgStatus.className = 'metric-badge badge-success';
     } else {
       el.kpiAvgStatus.textContent = 'En Riesgo';
@@ -390,7 +409,7 @@
       }
     }
     if (el.kpiPassRateFill) el.kpiPassRateFill.style.width = `${Math.min(100, Math.max(0, passRate))}%`;
-    if (el.kpiPassRateSub) el.kpiPassRateSub.textContent = `${passedCount} de ${totalStudents} acreditados`;
+    if (el.kpiPassRateSub) el.kpiPassRateSub.textContent = `${passedCount} de ${totalStudents} aprobados`;
 
     // Aprobados vs Reprobados Split
     if (el.kpiMinPassTag) el.kpiMinPassTag.textContent = `Mín. ${minPass.toFixed(1)}`;
@@ -579,7 +598,7 @@
       // Individual average & status
       rowHtml += `
         <td class="col-pinned-right col-avg student-avg-cell ${isPassed ? 'text-success' : 'text-danger'}">
-          ${avg.toFixed(1)}
+          ${avg}
         </td>
         <td class="col-pinned-right col-status">
           <span class="badge-status ${isPassed ? 'badge-status-pass' : 'badge-status-fail'}">
