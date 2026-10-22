@@ -39,6 +39,7 @@
     tabRawAvg: document.getElementById('tabRawAvg'),
     badgeAvgMode: document.getElementById('badgeAvgMode'),
     inputMinPassing: document.getElementById('inputMinPassing'),
+    btnAddNewTask: document.getElementById('btnAddNewTask'),
     btnExportGroup: document.getElementById('btnExportGroup'),
     btnDeleteCurrentGroup: document.getElementById('btnDeleteCurrentGroup'),
 
@@ -402,11 +403,13 @@
       el.activeGroupMeta.textContent = 'Carga un archivo .xlsx para comenzar';
       if (el.btnExportGroup) el.btnExportGroup.disabled = true;
       if (el.btnDeleteCurrentGroup) el.btnDeleteCurrentGroup.disabled = true;
+      if (el.btnAddNewTask) el.btnAddNewTask.disabled = true;
       return;
     }
 
     if (el.btnExportGroup) el.btnExportGroup.disabled = false;
     if (el.btnDeleteCurrentGroup) el.btnDeleteCurrentGroup.disabled = false;
+    if (el.btnAddNewTask) el.btnAddNewTask.disabled = false;
 
     el.emptyStateView.classList.add('hidden');
     el.groupWorkspace.classList.remove('hidden');
@@ -503,6 +506,221 @@
   /* ==========================================================================
      Table Rendering & Dynamic Columns
      ========================================================================== */
+  /* ==========================================================================
+     Task Management & Inline Live Grade Editing
+     ========================================================================== */
+  function addNewTaskPrompt() {
+    const group = getActiveGroup();
+    if (!group) {
+      showToast('Selecciona o importa un grupo primero');
+      return;
+    }
+
+    const defaultName = `Tarea ${group.tasks.length + 1}`;
+    const name = prompt('Nombre de la nueva tarea / actividad:', defaultName);
+    if (name === null) return;
+
+    const taskName = name.trim() || defaultName;
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = now.toLocaleDateString('es-MX', { month: 'short' }).replace('.', '');
+    const todayDate = `${day} ${month}`;
+
+    const newTask = {
+      id: `task_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      name: taskName,
+      date: todayDate
+    };
+
+    group.tasks.push(newTask);
+    group.students.forEach(s => {
+      s.grades[newTask.id] = null;
+    });
+
+    persistState();
+    updateDashboard();
+    renderTable();
+    showToast(`Tarea "${taskName}" agregada con éxito`);
+  }
+
+  function deleteTask(taskId) {
+    const group = getActiveGroup();
+    if (!group) return;
+
+    const task = group.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    if (!confirm(`¿Eliminar la tarea "${task.name}"?\nSe borrarán las calificaciones asignadas a esta tarea.`)) {
+      return;
+    }
+
+    group.tasks = group.tasks.filter(t => t.id !== taskId);
+    group.students.forEach(s => {
+      delete s.grades[taskId];
+    });
+
+    persistState();
+    updateDashboard();
+    renderTable();
+    showToast(`Tarea "${task.name}" eliminada`);
+  }
+
+  function updateStudentRowMetrics(studentId) {
+    const group = getActiveGroup();
+    if (!group) return;
+
+    const student = group.students.find(s => s.id === studentId);
+    if (!student) return;
+
+    const tr = el.gradesTableBody.querySelector(`tr[data-student-id="${studentId}"]`);
+    if (!tr) return;
+
+    const treatAsZero = state.settings.treatMissingAsZero;
+    const minPass = state.settings.minPassingGrade;
+    const isRoundMode = state.settings.roundAverages !== false;
+
+    const rawAvg = computeStudentRawAverage(student, group.tasks, treatAsZero);
+    const roundedAvg = roundAverage(rawAvg);
+    const currentAvg = isRoundMode ? roundedAvg : Math.round(rawAvg * 100) / 100;
+    const isPassed = currentAvg >= minPass;
+
+    const mainDisplay = isRoundMode 
+      ? `${roundedAvg}` 
+      : (Math.round(rawAvg * 100) / 100).toFixed(2);
+
+    const subDisplay = isRoundMode 
+      ? `(${(Math.round(rawAvg * 100) / 100).toFixed(2)})` 
+      : `(Red: ${roundedAvg})`;
+
+    const tooltipText = isRoundMode
+      ? `Promedio redondeado (CBTis): ${roundedAvg} • Sin redondear: ${(Math.round(rawAvg * 100) / 100).toFixed(2)}`
+      : `Promedio sin redondear: ${(Math.round(rawAvg * 100) / 100).toFixed(2)} • Redondeado CBTis: ${roundedAvg}`;
+
+    const avgCell = tr.querySelector('.student-avg-cell');
+    if (avgCell) {
+      avgCell.title = tooltipText;
+      avgCell.classList.toggle('text-success', isPassed);
+      avgCell.classList.toggle('text-danger', !isPassed);
+      const valDiv = avgCell.querySelector('.avg-cell-val');
+      if (valDiv) valDiv.textContent = mainDisplay;
+      const subDiv = avgCell.querySelector('.avg-cell-sub');
+      if (subDiv) subDiv.textContent = subDisplay;
+    }
+
+    const statusCell = tr.querySelector('.col-status');
+    if (statusCell) {
+      const badge = statusCell.querySelector('.badge-status');
+      if (badge) {
+        badge.className = `badge-status ${isPassed ? 'badge-status-pass' : 'badge-status-fail'}`;
+        badge.textContent = isPassed ? 'Aprobado' : 'Reprobado';
+      }
+    }
+
+    // Refresh KPI metrics in dashboard
+    updateDashboard();
+
+    // Update filter count tabs
+    const allStudents = group.students;
+    el.countAll.textContent = allStudents.length;
+    el.countPassed.textContent = allStudents.filter(s => computeStudentAverage(s, group.tasks, treatAsZero, isRoundMode) >= minPass).length;
+    el.countFailed.textContent = allStudents.filter(s => computeStudentAverage(s, group.tasks, treatAsZero, isRoundMode) < minPass).length;
+    if (el.countZero) {
+      el.countZero.textContent = allStudents.filter(s => computeStudentAverage(s, group.tasks, treatAsZero, isRoundMode) === 0).length;
+    }
+  }
+
+  function handleGradeChange(input) {
+    const studentId = input.getAttribute('data-student-id');
+    const taskId = input.getAttribute('data-task-id');
+    const group = getActiveGroup();
+    if (!group) return;
+
+    const student = group.students.find(s => s.id === studentId);
+    if (!student) return;
+
+    const rawVal = input.value.trim();
+    let newVal = null;
+
+    if (rawVal === '' || rawVal.toLowerCase() === 'np' || rawVal === '-') {
+      newVal = null;
+    } else {
+      const normalized = rawVal.replace(',', '.');
+      const num = parseFloat(normalized);
+      if (isNaN(num) || num < 0) {
+        const prev = student.grades[taskId];
+        input.value = prev !== null && prev !== undefined ? (Number.isInteger(prev) ? prev.toString() : prev.toFixed(1)) : '';
+        showToast('Ingresa un número válido entre 0 y 100 (o vacío para no entregado)');
+        return;
+      }
+      const clamped = Math.min(100, Math.max(0, num));
+      newVal = Math.round(clamped * 10) / 10;
+    }
+
+    if (student.grades[taskId] !== newVal) {
+      student.grades[taskId] = newVal;
+      persistState();
+
+      const hasVal = newVal !== null && newVal !== undefined;
+      const isZero = hasVal && newVal === 0;
+      input.value = hasVal ? (Number.isInteger(newVal) ? newVal.toString() : newVal.toFixed(1)) : '';
+      input.classList.toggle('grade-zero', isZero);
+      input.classList.toggle('grade-unsubmitted', !hasVal);
+
+      const parentTd = input.closest('td');
+      if (parentTd) {
+        parentTd.classList.toggle('grade-zero', isZero);
+        parentTd.classList.toggle('grade-unsubmitted', !hasVal);
+      }
+
+      input.classList.add('just-updated');
+      setTimeout(() => input.classList.remove('just-updated'), 700);
+
+      updateStudentRowMetrics(studentId);
+    }
+  }
+
+  function handleGradeKeyDown(e, input) {
+    const row = parseInt(input.getAttribute('data-row'), 10);
+    const col = parseInt(input.getAttribute('data-col'), 10);
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      input.blur();
+      const targetRow = e.shiftKey ? row - 1 : row + 1;
+      const nextInput = el.gradesTableBody.querySelector(`input.grade-cell-input[data-row="${targetRow}"][data-col="${col}"]`);
+      if (nextInput) {
+        nextInput.focus();
+        nextInput.select();
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const nextInput = el.gradesTableBody.querySelector(`input.grade-cell-input[data-row="${row + 1}"][data-col="${col}"]`);
+      if (nextInput) {
+        nextInput.focus();
+        nextInput.select();
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prevInput = el.gradesTableBody.querySelector(`input.grade-cell-input[data-row="${row - 1}"][data-col="${col}"]`);
+      if (prevInput) {
+        prevInput.focus();
+        prevInput.select();
+      }
+    } else if (e.key === 'Escape') {
+      const studentId = input.getAttribute('data-student-id');
+      const taskId = input.getAttribute('data-task-id');
+      const group = getActiveGroup();
+      if (group) {
+        const student = group.students.find(s => s.id === studentId);
+        if (student) {
+          const val = student.grades[taskId];
+          input.value = val !== null && val !== undefined ? (Number.isInteger(val) ? val.toString() : val.toFixed(1)) : '';
+        }
+      }
+      input.blur();
+    }
+  }
+
   function renderTable() {
     const group = getActiveGroup();
     if (!group) {
@@ -516,7 +734,6 @@
     const minPass = state.settings.minPassingGrade;
 
     // 1. Rebuild Headers (Dates Row & Tasks Row)
-    // Clear dynamic columns between student col and metrics col
     el.theadDatesRow.innerHTML = `
       <th class="col-pinned col-idx">#</th>
       <th class="col-pinned col-student">FECHA DE ENTREGA:</th>
@@ -529,20 +746,135 @@
       </th>
     `;
 
-    // Append dynamic task columns
-    group.tasks.forEach((t) => {
+    // Append dynamic task columns with inline editable date and title
+    group.tasks.forEach((t, colIndex) => {
       // Date row
       const thDate = document.createElement('th');
-      thDate.className = 'font-mono';
-      thDate.textContent = t.date || '-';
+      thDate.className = 'font-mono task-header-th task-date-th';
+      thDate.innerHTML = `
+        <div class="task-date-container">
+          <span class="task-date-text" title="Clic para editar fecha de entrega">${escapeHtml(t.date || '-')}</span>
+          <input class="task-header-input task-date-input hidden" type="text" value="${escapeHtml(t.date && t.date !== '-' ? t.date : '')}" placeholder="Fecha..." />
+        </div>
+      `;
+
+      const dateText = thDate.querySelector('.task-date-text');
+      const dateInput = thDate.querySelector('.task-date-input');
+
+      const activateDateEdit = () => {
+        dateText.classList.add('hidden');
+        dateInput.classList.remove('hidden');
+        dateInput.focus();
+        dateInput.select();
+      };
+
+      const saveDateEdit = () => {
+        const newDate = dateInput.value.trim() || '-';
+        if (t.date !== newDate) {
+          t.date = newDate;
+          dateText.textContent = newDate;
+          persistState();
+          showToast(`Fecha de "${t.name}" actualizada: ${newDate}`);
+        }
+        dateInput.classList.add('hidden');
+        dateText.classList.remove('hidden');
+      };
+
+      dateText.addEventListener('click', activateDateEdit);
+      dateInput.addEventListener('blur', saveDateEdit);
+      dateInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          saveDateEdit();
+        } else if (e.key === 'Escape') {
+          dateInput.value = t.date || '';
+          dateInput.classList.add('hidden');
+          dateText.classList.remove('hidden');
+        }
+      });
+
       el.theadDatesRow.appendChild(thDate);
 
-      // Task name row
+      // Task title row
       const thTask = document.createElement('th');
-      thTask.title = t.name;
-      thTask.textContent = t.name;
+      thTask.className = 'task-header-th task-name-th';
+      thTask.innerHTML = `
+        <div class="task-name-container">
+          <span class="task-name-text" title="Clic para editar título: ${escapeHtml(t.name)}">${escapeHtml(t.name)}</span>
+          <input class="task-header-input task-name-input hidden" type="text" value="${escapeHtml(t.name)}" placeholder="Nombre de tarea..." />
+          <button type="button" class="btn-delete-task" title="Eliminar tarea &quot;${escapeHtml(t.name)}&quot;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 6L6 18M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+      `;
+
+      const nameText = thTask.querySelector('.task-name-text');
+      const nameInput = thTask.querySelector('.task-name-input');
+      const btnDelete = thTask.querySelector('.btn-delete-task');
+
+      const activateNameEdit = () => {
+        nameText.classList.add('hidden');
+        nameInput.classList.remove('hidden');
+        nameInput.focus();
+        nameInput.select();
+      };
+
+      const saveNameEdit = () => {
+        const newName = nameInput.value.trim();
+        if (newName && t.name !== newName) {
+          t.name = newName;
+          nameText.textContent = newName;
+          nameText.title = `Clic para editar título: ${newName}`;
+          persistState();
+          updateDashboard();
+          showToast(`Tarea renombrada a "${newName}"`);
+        }
+        nameInput.classList.add('hidden');
+        nameText.classList.remove('hidden');
+      };
+
+      nameText.addEventListener('click', activateNameEdit);
+      nameInput.addEventListener('blur', saveNameEdit);
+      nameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          saveNameEdit();
+        } else if (e.key === 'Escape') {
+          nameInput.value = t.name;
+          nameInput.classList.add('hidden');
+          nameText.classList.remove('hidden');
+        }
+      });
+
+      btnDelete.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteTask(t.id);
+      });
+
       el.theadTasksRow.appendChild(thTask);
     });
+
+    // Append "+ Tarea" Column in Header
+    const thAddDate = document.createElement('th');
+    thAddDate.className = 'col-add-task-th';
+    el.theadDatesRow.appendChild(thAddDate);
+
+    const thAddTask = document.createElement('th');
+    thAddTask.className = 'col-add-task-th';
+    thAddTask.innerHTML = `
+      <button type="button" class="btn-add-task-col" id="btnTableAddTask" title="Agregar una nueva tarea a este grupo">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        <span>+ Tarea</span>
+      </button>
+    `;
+    const btnTableAddTask = thAddTask.querySelector('#btnTableAddTask');
+    if (btnTableAddTask) {
+      btnTableAddTask.addEventListener('click', addNewTaskPrompt);
+    }
+    el.theadTasksRow.appendChild(thAddTask);
 
     // Pinned Right Columns (Metrics & Condition)
     const appendPinnedRight = (row, html) => {
@@ -650,7 +982,7 @@
     }
     el.tableSearchEmpty.classList.add('hidden');
 
-    list.forEach((student, index) => {
+    list.forEach((student, rowIndex) => {
       const rawAvg = computeStudentRawAverage(student, group.tasks, treatAsZero);
       const roundedAvg = roundAverage(rawAvg);
       const currentAvg = isRoundMode ? roundedAvg : Math.round(rawAvg * 100) / 100;
@@ -669,39 +1001,77 @@
         : `Promedio sin redondear: ${(Math.round(rawAvg * 100) / 100).toFixed(2)} • Redondeado CBTis: ${roundedAvg}`;
 
       const tr = document.createElement('tr');
+      tr.setAttribute('data-student-id', student.id);
+      tr.setAttribute('data-row-index', rowIndex);
 
-      let rowHtml = `
-        <td class="col-pinned col-idx">${index + 1}</td>
-        <td class="col-pinned col-student">
-          <span class="student-row-name">${escapeHtml(student.fullName)}</span>
-        </td>
-      `;
+      // Pinned Left columns
+      const tdIdx = document.createElement('td');
+      tdIdx.className = 'col-pinned col-idx';
+      tdIdx.textContent = rowIndex + 1;
+      tr.appendChild(tdIdx);
 
-      // Task grades
-      group.tasks.forEach(t => {
+      const tdStudent = document.createElement('td');
+      tdStudent.className = 'col-pinned col-student';
+      tdStudent.innerHTML = `<span class="student-row-name">${escapeHtml(student.fullName)}</span>`;
+      tr.appendChild(tdStudent);
+
+      // Task grades editable cells
+      group.tasks.forEach((t, colIndex) => {
         const val = student.grades[t.id];
-        if (val !== null && val !== undefined) {
-          const isZero = val === 0;
-          rowHtml += `<td class="grade-cell ${isZero ? 'grade-zero' : ''}">${val.toFixed(1)}</td>`;
-        } else {
-          rowHtml += `<td class="grade-cell grade-unsubmitted">${treatAsZero ? '0.0' : '-'}</td>`;
-        }
+        const hasVal = val !== null && val !== undefined && !isNaN(val);
+        const displayVal = hasVal ? (Number.isInteger(val) ? val.toString() : val.toFixed(1)) : '';
+        const isZero = hasVal && val === 0;
+        const isUnsubmitted = !hasVal;
+
+        const td = document.createElement('td');
+        td.className = `grade-cell ${isZero ? 'grade-zero' : ''} ${isUnsubmitted ? 'grade-unsubmitted' : ''}`;
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = `grade-cell-input ${isZero ? 'grade-zero' : ''} ${isUnsubmitted ? 'grade-unsubmitted' : ''}`;
+        input.value = displayVal;
+        input.placeholder = treatAsZero ? '0.0' : '-';
+        input.setAttribute('data-student-id', student.id);
+        input.setAttribute('data-task-id', t.id);
+        input.setAttribute('data-row', rowIndex);
+        input.setAttribute('data-col', colIndex);
+        input.title = `Calificación de ${escapeHtml(student.fullName)} en "${escapeHtml(t.name)}"`;
+        input.autocomplete = 'off';
+        input.spellcheck = false;
+
+        input.addEventListener('focus', () => input.select());
+        input.addEventListener('change', () => handleGradeChange(input));
+        input.addEventListener('blur', () => handleGradeChange(input));
+        input.addEventListener('keydown', (e) => handleGradeKeyDown(e, input));
+
+        td.appendChild(input);
+        tr.appendChild(td);
       });
 
-      // Individual average & status
-      rowHtml += `
-        <td class="col-pinned-right col-avg student-avg-cell ${isPassed ? 'text-success' : 'text-danger'}" title="${tooltipText}">
-          <div class="avg-cell-val">${mainDisplay}</div>
-          <div class="avg-cell-sub">${subDisplay}</div>
-        </td>
-        <td class="col-pinned-right col-status">
-          <span class="badge-status ${isPassed ? 'badge-status-pass' : 'badge-status-fail'}">
-            ${isPassed ? 'Aprobado' : 'Reprobado'}
-          </span>
-        </td>
-      `;
+      // Empty cell under "+ Tarea"
+      const tdAddEmpty = document.createElement('td');
+      tdAddEmpty.className = 'col-add-task-empty';
+      tr.appendChild(tdAddEmpty);
 
-      tr.innerHTML = rowHtml;
+      // Pinned Right columns (Avg & Condition)
+      const tdAvg = document.createElement('td');
+      tdAvg.className = `col-pinned-right col-avg student-avg-cell ${isPassed ? 'text-success' : 'text-danger'}`;
+      tdAvg.title = tooltipText;
+      tdAvg.innerHTML = `
+        <div class="avg-cell-val">${mainDisplay}</div>
+        <div class="avg-cell-sub">${subDisplay}</div>
+      `;
+      tr.appendChild(tdAvg);
+
+      const tdStatus = document.createElement('td');
+      tdStatus.className = 'col-pinned-right col-status';
+      tdStatus.innerHTML = `
+        <span class="badge-status ${isPassed ? 'badge-status-pass' : 'badge-status-fail'}">
+          ${isPassed ? 'Aprobado' : 'Reprobado'}
+        </span>
+      `;
+      tr.appendChild(tdStatus);
+
       el.gradesTableBody.appendChild(tr);
     });
   }
@@ -906,6 +1276,11 @@
 
     // Export button
     el.btnExportGroup.addEventListener('click', exportActiveGroupToExcel);
+
+    // Add New Task Button
+    if (el.btnAddNewTask) {
+      el.btnAddNewTask.addEventListener('click', addNewTaskPrompt);
+    }
 
     // Modal controls
     el.btnOpenUploadModal.addEventListener('click', () => {

@@ -919,7 +919,7 @@ input:checked + .slider:before {
   font-family: var(--font-mono);
   font-size: 0.675rem;
   font-weight: 400;
-  padding: 0.45rem 0.85rem;
+  padding: 0.45rem 0.65rem;
   border-bottom: 1px solid var(--border-subtle);
   white-space: nowrap;
 }
@@ -930,7 +930,7 @@ input:checked + .slider:before {
   color: var(--text-primary);
   font-size: 0.775rem;
   font-weight: 600;
-  padding: 0.65rem 0.85rem;
+  padding: 0.55rem 0.65rem;
   border-bottom: 1px solid var(--border-subtle);
   white-space: nowrap;
 }
@@ -948,6 +948,134 @@ input:checked + .slider:before {
   font-size: 0.7rem;
   color: var(--text-tertiary);
   margin-left: 0.3rem;
+}
+
+/* Task Header Containers & Inline Edit */
+.task-header-th {
+  min-width: 105px;
+  position: relative;
+}
+
+.task-date-container, .task-name-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  position: relative;
+}
+
+.task-date-text {
+  cursor: pointer;
+  padding: 0.15rem 0.35rem;
+  border-radius: var(--radius-xs);
+  transition: all var(--trans-fast);
+  color: var(--text-secondary);
+}
+
+.task-date-text:hover {
+  background-color: var(--bg-subtle);
+  color: var(--text-primary);
+  text-decoration: underline dotted;
+}
+
+.task-name-text {
+  cursor: pointer;
+  padding: 0.15rem 0.35rem;
+  border-radius: var(--radius-xs);
+  transition: all var(--trans-fast);
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+}
+
+.task-name-text:hover {
+  background-color: var(--bg-subtle);
+  text-decoration: underline dotted;
+}
+
+.task-header-input {
+  width: 100%;
+  max-width: 120px;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-focus);
+  border-radius: var(--radius-xs);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.35rem;
+  text-align: center;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05);
+}
+
+.task-header-input:focus {
+  border-color: var(--text-primary);
+}
+
+.btn-delete-task {
+  opacity: 0;
+  visibility: hidden;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 0.15rem;
+  border-radius: var(--radius-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--trans-fast);
+}
+
+.task-name-th:hover .btn-delete-task {
+  opacity: 1;
+  visibility: visible;
+}
+
+.btn-delete-task:hover {
+  color: var(--color-danger);
+  background-color: rgba(239, 68, 68, 0.12);
+}
+
+/* Add Task Column in Header */
+.col-add-task-th {
+  text-align: center;
+  vertical-align: middle;
+  padding: 0.35rem 0.5rem;
+  width: 90px;
+  min-width: 90px;
+  border-bottom: 1px solid var(--border-subtle);
+  background-color: var(--bg-card);
+}
+
+.btn-add-task-col {
+  background-color: var(--bg-subtle);
+  border: 1px dashed var(--border-strong);
+  color: var(--text-secondary);
+  font-size: 0.725rem;
+  font-weight: 500;
+  padding: 0.25rem 0.55rem;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all var(--trans-fast);
+}
+
+.btn-add-task-col:hover {
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+  background-color: var(--bg-card-hover);
+}
+
+.col-add-task-empty {
+  border-bottom: 1px solid var(--border-subtle);
+  width: 90px;
+  min-width: 90px;
 }
 
 /* Row 3: Class Task Average Summary */
@@ -1061,17 +1189,66 @@ input:checked + .slider:before {
   font-family: var(--font-mono);
   font-size: 0.8125rem;
   color: var(--text-primary);
-  min-width: 75px;
+  min-width: 80px;
+  padding: 0.35rem 0.4rem !important;
+  position: relative;
 }
 
-.grade-zero {
+.grade-cell-input {
+  width: 100%;
+  max-width: 70px;
+  margin: 0 auto;
+  display: block;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  padding: 0.25rem 0.2rem;
+  outline: none;
+  cursor: pointer;
+  transition: all var(--trans-fast);
+}
+
+.grade-cell-input:hover {
+  background-color: var(--bg-subtle);
+  border-color: var(--border-subtle);
+}
+
+.grade-cell-input:focus {
+  background-color: var(--bg-card);
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 1px var(--text-primary);
+  cursor: text;
+}
+
+.grade-cell-input.grade-zero {
   color: var(--text-tertiary);
+  font-weight: 400;
 }
 
-.grade-unsubmitted {
+.grade-cell-input.grade-unsubmitted {
   color: var(--text-tertiary);
   font-style: italic;
-  font-size: 0.725rem;
+  font-weight: 400;
+}
+
+.grade-cell-input.just-updated {
+  animation: cellFlash 0.7s ease;
+}
+
+@keyframes cellFlash {
+  0% {
+    background-color: rgba(16, 185, 129, 0.25);
+    border-color: #10b981;
+  }
+  100% {
+    background-color: transparent;
+    border-color: transparent;
+  }
 }
 
 .student-avg-cell {
