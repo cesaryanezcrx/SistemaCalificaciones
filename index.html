@@ -115,6 +115,17 @@
             </label>
           </div>
 
+          <!-- Round averages toggle -->
+          <div class="setting-toggle-box" title="Alternar entre ver promedios redondeados (norma CBTis) o sin redondear (con decimales)">
+            <label class="switch-label" for="toggleRoundAverages">
+              <span id="labelRoundAverages">Redondear promedios</span>
+              <span class="toggle-switch">
+                <input type="checkbox" id="toggleRoundAverages" checked>
+                <span class="slider"></span>
+              </span>
+            </label>
+          </div>
+
           <!-- Passing grade config -->
           <div class="passing-grade-input-box" title="Calificación mínima para considerar una materia/tarea acreditada">
             <label for="inputMinPassing">Mínimo Aprobatorio:</label>
@@ -280,6 +291,15 @@
             <button class="filter-tab" data-filter="failed">Reprobados (<span id="countFailed">0</span>)</button>
             <button class="filter-tab" data-filter="zero">Promedio 0 (<span id="countZero">0</span>)</button>
           </div>
+
+          <!-- Rounding Filter Tabs -->
+          <div class="rounding-controls-group" title="Alternar modo de visualización de promedios">
+            <span class="toolbar-caption">Promedios:</span>
+            <div class="filter-tabs-group">
+              <button class="filter-tab active" id="tabRoundAvg" data-round="true" title="Redondeo oficial CBTis (enteros)">Redondeados</button>
+              <button class="filter-tab" id="tabRawAvg" data-round="false" title="Promedios con decimales sin redondear">Sin redondear</button>
+            </div>
+          </div>
         </section>
 
         <!-- Minimalist Table Container -->
@@ -304,9 +324,14 @@
                     <span class="sort-indicator" id="nameSortIndicator">▲</span>
                   </th>
                   <!-- Dynamic assignment title headers -->
-                  <th class="col-pinned-right col-avg sortable" id="thStudentAvg">
-                    <span>Promedio</span>
-                    <span class="sort-indicator" id="avgSortIndicator">⇅</span>
+                  <th class="col-pinned-right col-avg sortable" id="thStudentAvg" title="Ordenar por promedio • Alternar modo redondeado/sin redondear">
+                    <div class="avg-header-inner">
+                      <div class="avg-header-top">
+                        <span>Promedio</span>
+                        <span class="sort-indicator" id="avgSortIndicator">⇅</span>
+                      </div>
+                      <span class="badge-avg-mode" id="badgeAvgMode">Redondeado</span>
+                    </div>
                   </th>
                   <th class="col-pinned-right col-status">
                     <span>Condición</span>

@@ -883,6 +883,12 @@ input:checked + .slider:before {
   font-weight: 500;
 }
 
+.rounding-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 /* ==========================================================================
    Grades Table (Sticky Columns & Responsive Scroll)
    ========================================================================== */
@@ -988,9 +994,38 @@ input:checked + .slider:before {
 
 .col-avg {
   right: 110px;
-  width: 80px;
+  width: 96px;
   text-align: center;
   border-left: 1px solid var(--border-subtle);
+}
+
+.avg-header-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+}
+
+.avg-header-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.badge-avg-mode {
+  display: inline-block;
+  font-size: 0.575rem;
+  font-weight: 600;
+  padding: 0.08rem 0.35rem;
+  border-radius: var(--radius-xs);
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  pointer-events: none;
 }
 
 .col-status {
@@ -1044,6 +1079,21 @@ input:checked + .slider:before {
   font-family: var(--font-mono);
   font-weight: 600;
   font-size: 0.875rem;
+  padding: 0.45rem 0.5rem !important;
+}
+
+.avg-cell-val {
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.avg-cell-sub {
+  font-size: 0.65rem;
+  color: var(--text-tertiary);
+  font-weight: 400;
+  margin-top: 0.15rem;
+  line-height: 1;
 }
 
 /* Minimalist Status Badges */

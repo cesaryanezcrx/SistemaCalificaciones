@@ -15,6 +15,7 @@
     currentFilter: 'all', // 'all' | 'passed' | 'failed'
     settings: {
       treatMissingAsZero: true,
+      roundAverages: true, // true: redondeado oficial CBTis (enteros), false: sin redondear (con decimales)
       minPassingGrade: 6.0
     }
   };
@@ -32,6 +33,11 @@
     activeGroupName: document.getElementById('activeGroupName'),
     activeGroupMeta: document.getElementById('activeGroupMeta'),
     toggleMissingAsZero: document.getElementById('toggleMissingAsZero'),
+    toggleRoundAverages: document.getElementById('toggleRoundAverages'),
+    labelRoundAverages: document.getElementById('labelRoundAverages'),
+    tabRoundAvg: document.getElementById('tabRoundAvg'),
+    tabRawAvg: document.getElementById('tabRawAvg'),
+    badgeAvgMode: document.getElementById('badgeAvgMode'),
     inputMinPassing: document.getElementById('inputMinPassing'),
     btnExportGroup: document.getElementById('btnExportGroup'),
     btnDeleteCurrentGroup: document.getElementById('btnDeleteCurrentGroup'),
@@ -107,6 +113,9 @@
       if (savedSettings) {
         state.settings = { ...state.settings, ...JSON.parse(savedSettings) };
       }
+      if (typeof state.settings.roundAverages !== 'boolean') {
+        state.settings.roundAverages = true;
+      }
 
       if (savedGroups) {
         const parsed = JSON.parse(savedGroups);
@@ -133,6 +142,7 @@
     // Apply settings to UI
     el.toggleMissingAsZero.checked = state.settings.treatMissingAsZero;
     el.inputMinPassing.value = state.settings.minPassingGrade;
+    syncRoundingControls();
   }
 
   function persistState() {
@@ -321,7 +331,7 @@
     return Math.min(10, Math.max(0, rounded));
   }
 
-  function computeStudentAverage(student, tasks, treatAsZero) {
+  function computeStudentRawAverage(student, tasks, treatAsZero) {
     let sum = 0;
     let count = 0;
 
@@ -337,7 +347,46 @@
     });
 
     if (count === 0) return 0;
-    return roundAverage(sum / count);
+    return sum / count;
+  }
+
+  function computeStudentAverage(student, tasks, treatAsZero, shouldRound = state.settings.roundAverages) {
+    const raw = computeStudentRawAverage(student, tasks, treatAsZero);
+    if (shouldRound !== false) {
+      return roundAverage(raw);
+    }
+    return Math.round(raw * 100) / 100;
+  }
+
+  function syncRoundingControls() {
+    const isRound = state.settings.roundAverages !== false;
+    if (el.toggleRoundAverages) {
+      el.toggleRoundAverages.checked = isRound;
+    }
+    if (el.labelRoundAverages) {
+      el.labelRoundAverages.textContent = isRound ? 'Redondear promedios' : 'Sin redondear';
+    }
+    if (el.tabRoundAvg) {
+      el.tabRoundAvg.classList.toggle('active', isRound);
+    }
+    if (el.tabRawAvg) {
+      el.tabRawAvg.classList.toggle('active', !isRound);
+    }
+    const badge = document.getElementById('badgeAvgMode');
+    if (badge) {
+      badge.textContent = isRound ? 'Redondeado' : 'Sin redondear';
+    }
+  }
+
+  function setRoundingMode(round) {
+    state.settings.roundAverages = !!round;
+    syncRoundingControls();
+    persistState();
+    updateDashboard();
+    renderTable();
+    showToast(state.settings.roundAverages 
+      ? 'Promedios redondeados (Norma oficial CBTis)' 
+      : 'Promedios sin redondear (Con decimales exactos)');
   }
 
   function getActiveGroup() {
@@ -367,22 +416,34 @@
 
     const treatAsZero = state.settings.treatMissingAsZero;
     const minPass = state.settings.minPassingGrade;
+    const shouldRound = state.settings.roundAverages !== false;
 
     // Student Averages
-    const studentAvgs = group.students.map(s => computeStudentAverage(s, group.tasks, treatAsZero));
+    const studentAvgs = group.students.map(s => computeStudentAverage(s, group.tasks, treatAsZero, shouldRound));
+    const rawAvgs = group.students.map(s => computeStudentRawAverage(s, group.tasks, treatAsZero));
     const totalStudents = studentAvgs.length;
 
     // Group Average
-    const groupAvg = totalStudents > 0 ? (studentAvgs.reduce((a, b) => a + b, 0) / totalStudents) : 0;
-    const roundedGroupAvg = Math.round(groupAvg * 10) / 10;
+    const groupAvg = totalStudents > 0 
+      ? (shouldRound 
+          ? (studentAvgs.reduce((a, b) => a + b, 0) / totalStudents)
+          : (rawAvgs.reduce((a, b) => a + b, 0) / totalStudents))
+      : 0;
+    const roundedGroupAvg = shouldRound ? (Math.round(groupAvg * 10) / 10) : (Math.round(groupAvg * 100) / 100);
 
-    el.kpiGroupAvg.textContent = roundedGroupAvg.toFixed(1);
+    el.kpiGroupAvg.textContent = shouldRound ? roundedGroupAvg.toFixed(1) : roundedGroupAvg.toFixed(2);
     if (roundedGroupAvg >= minPass) {
       el.kpiAvgStatus.textContent = 'Aprobado';
       el.kpiAvgStatus.className = 'metric-badge badge-success';
     } else {
       el.kpiAvgStatus.textContent = 'En Riesgo';
       el.kpiAvgStatus.className = 'metric-badge badge-danger';
+    }
+
+    if (el.kpiAvgSub) {
+      el.kpiAvgSub.textContent = shouldRound 
+        ? 'Promedios redondeados (Norma CBTis)' 
+        : 'Promedios sin redondear (Con decimales)';
     }
 
     el.kpiTotalStudents.textContent = totalStudents;
@@ -496,9 +557,14 @@
     `);
 
     appendPinnedRight(el.theadTasksRow, `
-      <th class="col-pinned-right col-avg sortable" id="thStudentAvg">
-        <span>Promedio</span>
-        <span class="sort-indicator" id="avgSortIndicator">${state.currentSort.startsWith('avg') ? (state.currentSort === 'avg_desc' ? '▼' : '▲') : '⇅'}</span>
+      <th class="col-pinned-right col-avg sortable" id="thStudentAvg" title="Clic para ordenar por promedio • Alternar modo redondeado/sin redondear">
+        <div class="avg-header-inner">
+          <div class="avg-header-top">
+            <span>Promedio</span>
+            <span class="sort-indicator" id="avgSortIndicator">${state.currentSort.startsWith('avg') ? (state.currentSort === 'avg_desc' ? '▼' : '▲') : '⇅'}</span>
+          </div>
+          <span class="badge-avg-mode" id="badgeAvgMode">${state.settings.roundAverages ? 'Redondeado' : 'Sin redondear'}</span>
+        </div>
       </th>
       <th class="col-pinned-right col-status">
         <span>Condición</span>
@@ -509,12 +575,23 @@
     document.getElementById('thStudentName').addEventListener('click', () => {
       setSort(state.currentSort === 'name_asc' ? 'name_desc' : 'name_asc');
     });
-    document.getElementById('thStudentAvg').addEventListener('click', () => {
-      setSort(state.currentSort === 'avg_desc' ? 'avg_asc' : 'avg_desc');
-    });
+    const thStudentAvg = document.getElementById('thStudentAvg');
+    if (thStudentAvg) {
+      thStudentAvg.addEventListener('click', () => {
+        setSort(state.currentSort === 'avg_desc' ? 'avg_asc' : 'avg_desc');
+      });
+    }
+    const badgeAvgMode = document.getElementById('badgeAvgMode');
+    if (badgeAvgMode) {
+      badgeAvgMode.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setRoundingMode(!state.settings.roundAverages);
+      });
+    }
 
     // 2. Filter & Sort Student List
     let list = [...group.students];
+    const isRoundMode = state.settings.roundAverages !== false;
 
     // Search filter
     if (state.searchQuery) {
@@ -527,17 +604,19 @@
 
     // Status filter
     if (state.currentFilter === 'passed') {
-      list = list.filter(s => computeStudentAverage(s, group.tasks, treatAsZero) >= minPass);
+      list = list.filter(s => computeStudentAverage(s, group.tasks, treatAsZero, isRoundMode) >= minPass);
     } else if (state.currentFilter === 'failed') {
-      list = list.filter(s => computeStudentAverage(s, group.tasks, treatAsZero) < minPass);
+      list = list.filter(s => computeStudentAverage(s, group.tasks, treatAsZero, isRoundMode) < minPass);
     } else if (state.currentFilter === 'zero') {
-      list = list.filter(s => computeStudentAverage(s, group.tasks, treatAsZero) === 0);
+      list = list.filter(s => computeStudentAverage(s, group.tasks, treatAsZero, isRoundMode) === 0);
     }
 
     // Sorting
     list.sort((a, b) => {
-      const avgA = computeStudentAverage(a, group.tasks, treatAsZero);
-      const avgB = computeStudentAverage(b, group.tasks, treatAsZero);
+      const rawA = computeStudentRawAverage(a, group.tasks, treatAsZero);
+      const rawB = computeStudentRawAverage(b, group.tasks, treatAsZero);
+      const avgA = isRoundMode ? roundAverage(rawA) : Math.round(rawA * 100) / 100;
+      const avgB = isRoundMode ? roundAverage(rawB) : Math.round(rawB * 100) / 100;
 
       if (state.currentSort === 'name_asc') {
         return (a.apellidos || a.fullName).localeCompare(b.apellidos || b.fullName, 'es', { sensitivity: 'base' });
@@ -546,10 +625,10 @@
         return (b.apellidos || b.fullName).localeCompare(a.apellidos || a.fullName, 'es', { sensitivity: 'base' });
       }
       if (state.currentSort === 'avg_desc') {
-        return avgB - avgA;
+        return (avgB - avgA) || (rawB - rawA);
       }
       if (state.currentSort === 'avg_asc') {
-        return avgA - avgB;
+        return (avgA - avgB) || (rawA - rawB);
       }
       return 0;
     });
@@ -557,10 +636,10 @@
     // Update counts
     const allStudents = group.students;
     el.countAll.textContent = allStudents.length;
-    el.countPassed.textContent = allStudents.filter(s => computeStudentAverage(s, group.tasks, treatAsZero) >= minPass).length;
-    el.countFailed.textContent = allStudents.filter(s => computeStudentAverage(s, group.tasks, treatAsZero) < minPass).length;
+    el.countPassed.textContent = allStudents.filter(s => computeStudentAverage(s, group.tasks, treatAsZero, isRoundMode) >= minPass).length;
+    el.countFailed.textContent = allStudents.filter(s => computeStudentAverage(s, group.tasks, treatAsZero, isRoundMode) < minPass).length;
     if (el.countZero) {
-      el.countZero.textContent = allStudents.filter(s => computeStudentAverage(s, group.tasks, treatAsZero) === 0).length;
+      el.countZero.textContent = allStudents.filter(s => computeStudentAverage(s, group.tasks, treatAsZero, isRoundMode) === 0).length;
     }
 
     // 3. Render Body Rows
@@ -572,8 +651,22 @@
     el.tableSearchEmpty.classList.add('hidden');
 
     list.forEach((student, index) => {
-      const avg = computeStudentAverage(student, group.tasks, treatAsZero);
-      const isPassed = avg >= minPass;
+      const rawAvg = computeStudentRawAverage(student, group.tasks, treatAsZero);
+      const roundedAvg = roundAverage(rawAvg);
+      const currentAvg = isRoundMode ? roundedAvg : Math.round(rawAvg * 100) / 100;
+      const isPassed = currentAvg >= minPass;
+
+      const mainDisplay = isRoundMode 
+        ? `${roundedAvg}` 
+        : (Math.round(rawAvg * 100) / 100).toFixed(2);
+
+      const subDisplay = isRoundMode 
+        ? `(${(Math.round(rawAvg * 100) / 100).toFixed(2)})` 
+        : `(Red: ${roundedAvg})`;
+
+      const tooltipText = isRoundMode
+        ? `Promedio redondeado (CBTis): ${roundedAvg} • Sin redondear: ${(Math.round(rawAvg * 100) / 100).toFixed(2)}`
+        : `Promedio sin redondear: ${(Math.round(rawAvg * 100) / 100).toFixed(2)} • Redondeado CBTis: ${roundedAvg}`;
 
       const tr = document.createElement('tr');
 
@@ -597,8 +690,9 @@
 
       // Individual average & status
       rowHtml += `
-        <td class="col-pinned-right col-avg student-avg-cell ${isPassed ? 'text-success' : 'text-danger'}">
-          ${avg}
+        <td class="col-pinned-right col-avg student-avg-cell ${isPassed ? 'text-success' : 'text-danger'}" title="${tooltipText}">
+          <div class="avg-cell-val">${mainDisplay}</div>
+          <div class="avg-cell-sub">${subDisplay}</div>
         </td>
         <td class="col-pinned-right col-status">
           <span class="badge-status ${isPassed ? 'badge-status-pass' : 'badge-status-fail'}">
@@ -744,6 +838,25 @@
       showToast(state.settings.treatMissingAsZero ? 'No entregadas calculadas como 0.0' : 'No entregadas excluidas del promedio');
     });
 
+    // Rounding mode toggle (top-nav)
+    if (el.toggleRoundAverages) {
+      el.toggleRoundAverages.addEventListener('change', () => {
+        setRoundingMode(el.toggleRoundAverages.checked);
+      });
+    }
+
+    // Rounding mode buttons (toolbar)
+    if (el.tabRoundAvg) {
+      el.tabRoundAvg.addEventListener('click', () => {
+        setRoundingMode(true);
+      });
+    }
+    if (el.tabRawAvg) {
+      el.tabRawAvg.addEventListener('click', () => {
+        setRoundingMode(false);
+      });
+    }
+
     // Min Passing Grade
     el.inputMinPassing.addEventListener('change', () => {
       const val = parseFloat(el.inputMinPassing.value) || 6.0;
@@ -774,10 +887,10 @@
     el.btnSortAvgDesc.addEventListener('click', () => setSort('avg_desc'));
     el.btnSortAvgAsc.addEventListener('click', () => setSort('avg_asc'));
 
-    // Filter tabs
-    document.querySelectorAll('.filter-tab').forEach(tab => {
+    // Status filter tabs (only tabs with data-filter attribute)
+    document.querySelectorAll('.filter-tabs-group button[data-filter]').forEach(tab => {
       tab.addEventListener('click', () => {
-        document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.filter-tabs-group button[data-filter]').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         state.currentFilter = tab.getAttribute('data-filter');
         renderTable();
@@ -893,6 +1006,7 @@
 
     const treatAsZero = state.settings.treatMissingAsZero;
     const minPass = state.settings.minPassingGrade;
+    const isRoundMode = state.settings.roundAverages !== false;
 
     // Build rows adhering to clean spreadsheet standards
     const rows = [];
@@ -900,14 +1014,16 @@
     // Row 1: Dates
     const rowDates = ['FECHAS DE ENTREGA', ''];
     group.tasks.forEach(t => rowDates.push(t.date || ''));
-    rowDates.push('PROMEDIO');
+    rowDates.push('PROM. SIN REDONDEAR');
+    rowDates.push('PROM. REDONDEADO');
     rowDates.push('CONDICIÓN');
     rows.push(rowDates);
 
     // Row 2: Task Names
     const rowTasks = ['APELLIDOS', 'NOMBRES'];
     group.tasks.forEach(t => rowTasks.push(t.name));
-    rowTasks.push('PROMEDIO INDIVIDUAL');
+    rowTasks.push('DECIMALES (EXACTO)');
+    rowTasks.push('OFICIAL (NORMA CBTIS)');
     rowTasks.push('ESTADO');
     rows.push(rowTasks);
 
@@ -926,22 +1042,31 @@
       });
       rowAvgSummary.push(count > 0 ? Math.round((sum / count) * 10) / 10 : 0);
     });
-    const allAvgs = group.students.map(s => computeStudentAverage(s, group.tasks, treatAsZero));
-    const groupAvg = allAvgs.length > 0 ? (allAvgs.reduce((a, b) => a + b, 0) / allAvgs.length) : 0;
-    rowAvgSummary.push(Math.round(groupAvg * 10) / 10);
+    const allRawAvgs = group.students.map(s => computeStudentRawAverage(s, group.tasks, treatAsZero));
+    const allRoundedAvgs = allRawAvgs.map(raw => roundAverage(raw));
+    const classRawAvg = allRawAvgs.length > 0 ? (allRawAvgs.reduce((a, b) => a + b, 0) / allRawAvgs.length) : 0;
+    const classRoundedAvg = allRoundedAvgs.length > 0 ? (allRoundedAvgs.reduce((a, b) => a + b, 0) / allRoundedAvgs.length) : 0;
+
+    rowAvgSummary.push(Math.round(classRawAvg * 100) / 100);
+    rowAvgSummary.push(Math.round(classRoundedAvg * 10) / 10);
     rowAvgSummary.push('-');
     rows.push(rowAvgSummary);
 
     // Rows 4+: Students
     group.students.forEach(s => {
-      const avg = computeStudentAverage(s, group.tasks, treatAsZero);
+      const rawAvg = computeStudentRawAverage(s, group.tasks, treatAsZero);
+      const roundedAvg = roundAverage(rawAvg);
+      const exactAvg = Math.round(rawAvg * 100) / 100;
+      const currentAvg = isRoundMode ? roundedAvg : exactAvg;
+
       const studentRow = [s.apellidos, s.nombres];
       group.tasks.forEach(t => {
         const val = s.grades[t.id];
         studentRow.push(val !== null ? val : (treatAsZero ? 0 : ''));
       });
-      studentRow.push(avg);
-      studentRow.push(avg >= minPass ? 'Aprobado' : 'Reprobado');
+      studentRow.push(exactAvg);
+      studentRow.push(roundedAvg);
+      studentRow.push(currentAvg >= minPass ? 'Aprobado' : 'Reprobado');
       rows.push(studentRow);
     });
 
