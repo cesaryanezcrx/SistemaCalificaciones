@@ -1005,8 +1005,6 @@
     if (!group) return;
 
     const treatAsZero = state.settings.treatMissingAsZero;
-    const minPass = state.settings.minPassingGrade;
-    const isRoundMode = state.settings.roundAverages !== false;
 
     // Build rows adhering to clean spreadsheet standards
     const rows = [];
@@ -1014,17 +1012,13 @@
     // Row 1: Dates
     const rowDates = ['FECHAS DE ENTREGA', ''];
     group.tasks.forEach(t => rowDates.push(t.date || ''));
-    rowDates.push('PROM. SIN REDONDEAR');
-    rowDates.push('PROM. REDONDEADO');
-    rowDates.push('CONDICIÓN');
+    rowDates.push('PROMEDIO');
     rows.push(rowDates);
 
     // Row 2: Task Names
     const rowTasks = ['APELLIDOS', 'NOMBRES'];
     group.tasks.forEach(t => rowTasks.push(t.name));
-    rowTasks.push('DECIMALES (EXACTO)');
-    rowTasks.push('OFICIAL (NORMA CBTIS)');
-    rowTasks.push('ESTADO');
+    rowTasks.push('PROMEDIO');
     rows.push(rowTasks);
 
     // Row 3: Class Task Averages
@@ -1043,21 +1037,21 @@
       rowAvgSummary.push(count > 0 ? Math.round((sum / count) * 10) / 10 : 0);
     });
     const allRawAvgs = group.students.map(s => computeStudentRawAverage(s, group.tasks, treatAsZero));
-    const allRoundedAvgs = allRawAvgs.map(raw => roundAverage(raw));
     const classRawAvg = allRawAvgs.length > 0 ? (allRawAvgs.reduce((a, b) => a + b, 0) / allRawAvgs.length) : 0;
-    const classRoundedAvg = allRoundedAvgs.length > 0 ? (allRoundedAvgs.reduce((a, b) => a + b, 0) / allRoundedAvgs.length) : 0;
 
     rowAvgSummary.push(Math.round(classRawAvg * 100) / 100);
-    rowAvgSummary.push(Math.round(classRoundedAvg * 10) / 10);
-    rowAvgSummary.push('-');
     rows.push(rowAvgSummary);
 
-    // Rows 4+: Students
-    group.students.forEach(s => {
+    // Rows 4+: Students sorted alphabetically A - Z (by apellidos, then nombres)
+    const sortedStudents = [...group.students].sort((a, b) => {
+      const cmp = (a.apellidos || a.fullName || '').localeCompare(b.apellidos || b.fullName || '', 'es', { sensitivity: 'base' });
+      if (cmp !== 0) return cmp;
+      return (a.nombres || '').localeCompare(b.nombres || '', 'es', { sensitivity: 'base' });
+    });
+
+    sortedStudents.forEach(s => {
       const rawAvg = computeStudentRawAverage(s, group.tasks, treatAsZero);
-      const roundedAvg = roundAverage(rawAvg);
       const exactAvg = Math.round(rawAvg * 100) / 100;
-      const currentAvg = isRoundMode ? roundedAvg : exactAvg;
 
       const studentRow = [s.apellidos, s.nombres];
       group.tasks.forEach(t => {
@@ -1065,8 +1059,6 @@
         studentRow.push(val !== null ? val : (treatAsZero ? 0 : ''));
       });
       studentRow.push(exactAvg);
-      studentRow.push(roundedAvg);
-      studentRow.push(currentAvg >= minPass ? 'Aprobado' : 'Reprobado');
       rows.push(studentRow);
     });
 
