@@ -23,6 +23,17 @@
     }
   </script>
 
+  <!-- JSZip local with CDN fallback -->
+  <script src="vendor/jszip.min.js"></script>
+  <script>
+    if (typeof JSZip === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"><\/script>');
+    }
+  </script>
+
+  <!-- Official Base64 Template for Registro de Logros Docentes Individuales -->
+  <script src="vendor/docxTemplateData.js"></script>
+
   <!-- App Stylesheet -->
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -150,6 +161,18 @@
                 <line x1="12" y1="15" x2="12" y2="3" />
               </svg>
               <span>Exportar Excel</span>
+            </button>
+
+            <button id="btnOpenDocxModal" class="btn btn-secondary btn-sm btn-docx-trigger"
+              title="Llenar y descargar Registro de Logros Docentes Individuales (.docx)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10 9 9 9 8 9" />
+              </svg>
+              <span>Rellenar Word (Logros)</span>
             </button>
 
             <button id="btnDeleteCurrentGroup" class="btn btn-ghost-danger btn-sm"
@@ -360,6 +383,145 @@
         </section>
       </div>
     </main>
+  </div>
+
+  <!-- Modal: Registro de Logros Docentes Individuales (.docx) -->
+  <div class="modal-backdrop hidden" id="docxModal">
+    <div class="modal-box modal-box-wide">
+      <div class="modal-head">
+        <div>
+          <h3 class="modal-title">Registro de Logros Docentes Individuales</h3>
+          <p class="modal-subtitle">Rellena automáticamente % de Aprobación y Promedio General en el formato oficial (.docx)</p>
+        </div>
+        <button class="btn-close-modal" id="btnCloseDocxModal" aria-label="Cerrar">✕</button>
+      </div>
+
+      <div class="modal-content">
+        <!-- Grupo Activo Banner -->
+        <div class="docx-group-banner">
+          <div class="docx-banner-left">
+            <span class="docx-badge-dot"></span>
+            <div>
+              <span class="docx-group-name" id="docxModalGroupName">Grupo Seleccionado</span>
+              <span class="docx-group-meta" id="docxModalGroupMeta">0 alumnos registrados</span>
+            </div>
+          </div>
+          <span class="docx-pill-format">Plantilla Word CBTis</span>
+        </div>
+
+        <!-- Columna de destino -->
+        <div class="modal-field">
+          <label class="field-label-bold">Columna de destino en la tabla:</label>
+          <div class="column-pill-selector">
+            <label class="column-pill active" id="labelColPill1">
+              <input type="radio" name="docxColumnTarget" value="1" checked>
+              <div class="pill-content">
+                <span class="pill-title">Mes inmediato anterior</span>
+                <span class="pill-desc">1ª columna de indicadores</span>
+              </div>
+            </label>
+            <label class="column-pill" id="labelColPill2">
+              <input type="radio" name="docxColumnTarget" value="2">
+              <div class="pill-content">
+                <span class="pill-title">Hace dos meses anteriores</span>
+                <span class="pill-desc">2ª columna de indicadores</span>
+              </div>
+            </label>
+            <label class="column-pill" id="labelColPill3">
+              <input type="radio" name="docxColumnTarget" value="3">
+              <div class="pill-content">
+                <span class="pill-title">Acumulado del semestre</span>
+                <span class="pill-desc">3ª columna de indicadores</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Indicadores de Logro Académico -->
+        <div class="docx-section-card">
+          <div class="docx-section-head">
+            <span class="docx-section-title">Indicadores de Logro Académico (Calculados del Grupo)</span>
+            <span class="badge-auto-calc">Calculado en vivo</span>
+          </div>
+          <div class="modal-grid-2">
+            <div class="modal-field">
+              <label for="inputDocxPassRate">% de Aprobación:</label>
+              <div class="input-with-badge">
+                <input type="text" id="inputDocxPassRate" class="input-text font-mono input-highlight" placeholder="Ej. 85%" />
+                <span class="field-tag-badge" id="tagDocxPassRate">Aprobados</span>
+              </div>
+              <span class="field-hint" id="hintDocxPassRate">Calculado con base en la calificación mínima aprobatoria.</span>
+            </div>
+
+            <div class="modal-field">
+              <label for="inputDocxGroupAvg">Promedio General:</label>
+              <div class="input-with-badge">
+                <input type="text" id="inputDocxGroupAvg" class="input-text font-mono input-highlight" placeholder="Ej. 7.8" />
+                <span class="field-tag-badge" id="tagDocxGroupAvg">Promedio</span>
+              </div>
+              <span class="field-hint" id="hintDocxGroupAvg">Promedio grupal actual de actividades asignadas.</span>
+            </div>
+
+            <div class="modal-field">
+              <label for="inputDocxAttendance">% de Asistencia a clases (opcional):</label>
+              <input type="text" id="inputDocxAttendance" class="input-text font-mono" placeholder="Ej. 95% o dejar vacío" />
+              <span class="field-hint">Si lo dejas vacío, no modificará la celda del documento.</span>
+            </div>
+
+            <div class="modal-field">
+              <label for="inputDocxDropouts"># Alumnos baja / dejaron de asistir:</label>
+              <input type="text" id="inputDocxDropouts" class="input-text font-mono" placeholder="0" />
+              <span class="field-hint">Prellenado con alumnos sin entregas o promedio 0.0.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Datos del Encabezado (Opcionales) -->
+        <details class="docx-details-section">
+          <summary class="docx-details-summary">
+            <span>Datos adicionales del Encabezado (Docente, Academia, Fecha)</span>
+            <span class="summary-arrow">▾</span>
+          </summary>
+          <div class="modal-grid-2 docx-details-body">
+            <div class="modal-field">
+              <label for="inputDocxTeacherName">Nombre del Docente:</label>
+              <input type="text" id="inputDocxTeacherName" class="input-text" placeholder="Ej. Ing. César Yáñez" />
+              <span class="field-hint">Se guarda automáticamente para próximos reportes.</span>
+            </div>
+
+            <div class="modal-field">
+              <label for="inputDocxSubject">Materias del área que imparte:</label>
+              <input type="text" id="inputDocxSubject" class="input-text" placeholder="Ej. Programación Web" />
+              <span class="field-hint">Prellenado con el nombre del grupo activo.</span>
+            </div>
+
+            <div class="modal-field">
+              <label for="inputDocxAcademy">Academia de:</label>
+              <input type="text" id="inputDocxAcademy" class="input-text" placeholder="Ej. Tecnologías de la Información" />
+              <span class="field-hint">Se guarda automáticamente en tu navegador.</span>
+            </div>
+
+            <div class="modal-field">
+              <label for="inputDocxMeetingDate">Fecha de la reunión:</label>
+              <input type="text" id="inputDocxMeetingDate" class="input-text" placeholder="Ej. 23 de octubre de 2026" />
+              <span class="field-hint">Fecha que figurará en el encabezado.</span>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn btn-ghost" id="btnCancelDocxModal">Cancelar</button>
+        <button class="btn btn-primary" id="btnGenerateDocxDownload">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          <span>Descargar Word Rellenado (.docx)</span>
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Upload Modal Dialog -->

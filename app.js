@@ -41,6 +41,7 @@
     inputMinPassing: document.getElementById('inputMinPassing'),
     btnAddNewTask: document.getElementById('btnAddNewTask'),
     btnExportGroup: document.getElementById('btnExportGroup'),
+    btnOpenDocxModal: document.getElementById('btnOpenDocxModal'),
     btnDeleteCurrentGroup: document.getElementById('btnDeleteCurrentGroup'),
 
     // Empty View & Dropzone
@@ -89,7 +90,7 @@
     gradesTableBody: document.getElementById('gradesTableBody'),
     tableSearchEmpty: document.getElementById('tableSearchEmpty'),
 
-    // Modal
+    // Upload Modal
     uploadModal: document.getElementById('uploadModal'),
     btnCloseUploadModal: document.getElementById('btnCloseUploadModal'),
     btnCancelUpload: document.getElementById('btnCancelUpload'),
@@ -97,6 +98,26 @@
     modalDropZone: document.getElementById('modalDropZone'),
     modalFileInput: document.getElementById('modalFileInput'),
     btnModalBrowse: document.getElementById('btnModalBrowse'),
+
+    // Docx Report Modal
+    docxModal: document.getElementById('docxModal'),
+    btnCloseDocxModal: document.getElementById('btnCloseDocxModal'),
+    btnCancelDocxModal: document.getElementById('btnCancelDocxModal'),
+    btnGenerateDocxDownload: document.getElementById('btnGenerateDocxDownload'),
+    docxModalGroupName: document.getElementById('docxModalGroupName'),
+    docxModalGroupMeta: document.getElementById('docxModalGroupMeta'),
+    inputDocxPassRate: document.getElementById('inputDocxPassRate'),
+    tagDocxPassRate: document.getElementById('tagDocxPassRate'),
+    hintDocxPassRate: document.getElementById('hintDocxPassRate'),
+    inputDocxGroupAvg: document.getElementById('inputDocxGroupAvg'),
+    tagDocxGroupAvg: document.getElementById('tagDocxGroupAvg'),
+    hintDocxGroupAvg: document.getElementById('hintDocxGroupAvg'),
+    inputDocxAttendance: document.getElementById('inputDocxAttendance'),
+    inputDocxDropouts: document.getElementById('inputDocxDropouts'),
+    inputDocxTeacherName: document.getElementById('inputDocxTeacherName'),
+    inputDocxSubject: document.getElementById('inputDocxSubject'),
+    inputDocxAcademy: document.getElementById('inputDocxAcademy'),
+    inputDocxMeetingDate: document.getElementById('inputDocxMeetingDate'),
 
     // Toasts
     toastStack: document.getElementById('toastStack')
@@ -402,12 +423,14 @@
       el.activeGroupName.textContent = 'Sin grupo seleccionado';
       el.activeGroupMeta.textContent = 'Carga un archivo .xlsx para comenzar';
       if (el.btnExportGroup) el.btnExportGroup.disabled = true;
+      if (el.btnOpenDocxModal) el.btnOpenDocxModal.disabled = true;
       if (el.btnDeleteCurrentGroup) el.btnDeleteCurrentGroup.disabled = true;
       if (el.btnAddNewTask) el.btnAddNewTask.disabled = true;
       return;
     }
 
     if (el.btnExportGroup) el.btnExportGroup.disabled = false;
+    if (el.btnOpenDocxModal) el.btnOpenDocxModal.disabled = false;
     if (el.btnDeleteCurrentGroup) el.btnDeleteCurrentGroup.disabled = false;
     if (el.btnAddNewTask) el.btnAddNewTask.disabled = false;
 
@@ -1277,6 +1300,29 @@
     // Export button
     el.btnExportGroup.addEventListener('click', exportActiveGroupToExcel);
 
+    // Word Report (.docx) Modal
+    if (el.btnOpenDocxModal) {
+      el.btnOpenDocxModal.addEventListener('click', openDocxModal);
+    }
+    if (el.btnCloseDocxModal) {
+      el.btnCloseDocxModal.addEventListener('click', () => el.docxModal.classList.add('hidden'));
+    }
+    if (el.btnCancelDocxModal) {
+      el.btnCancelDocxModal.addEventListener('click', () => el.docxModal.classList.add('hidden'));
+    }
+    if (el.btnGenerateDocxDownload) {
+      el.btnGenerateDocxDownload.addEventListener('click', generateAndDownloadDocx);
+    }
+
+    // Column radio selector pills
+    document.querySelectorAll('input[name="docxColumnTarget"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        document.querySelectorAll('.column-pill').forEach(pill => pill.classList.remove('active'));
+        const activeLabel = radio.closest('.column-pill');
+        if (activeLabel) activeLabel.classList.add('active');
+      });
+    });
+
     // Add New Task Button
     if (el.btnAddNewTask) {
       el.btnAddNewTask.addEventListener('click', addNewTaskPrompt);
@@ -1444,6 +1490,299 @@
     const cleanFile = `${group.name.replace(/[^a-zA-Z0-9_-]/g, '_')}_Calculado.xlsx`;
     XLSX.writeFile(wb, cleanFile);
     showToast(`Archivo "${cleanFile}" descargado`);
+  }
+
+  /* ==========================================================================
+     Word Report: Registro de Logros Docentes Individuales (.docx)
+     ========================================================================== */
+  function openDocxModal() {
+    const group = getActiveGroup();
+    if (!group) {
+      showToast('Selecciona o importa un grupo primero');
+      return;
+    }
+
+    const treatAsZero = state.settings.treatMissingAsZero;
+    const minPass = state.settings.minPassingGrade;
+    const shouldRound = state.settings.roundAverages !== false;
+
+    // Student Averages
+    const studentAvgs = group.students.map(s => computeStudentAverage(s, group.tasks, treatAsZero, shouldRound));
+    const rawAvgs = group.students.map(s => computeStudentRawAverage(s, group.tasks, treatAsZero));
+    const totalStudents = group.students.length;
+
+    const groupAvg = totalStudents > 0 
+      ? (shouldRound 
+          ? (studentAvgs.reduce((a, b) => a + b, 0) / totalStudents)
+          : (rawAvgs.reduce((a, b) => a + b, 0) / totalStudents))
+      : 0;
+    const roundedGroupAvg = shouldRound ? (Math.round(groupAvg * 10) / 10) : (Math.round(groupAvg * 100) / 100);
+
+    const passedCount = studentAvgs.filter(avg => avg >= minPass).length;
+    const passRate = totalStudents > 0 ? (Math.round((passedCount / totalStudents) * 1000) / 10) : 0;
+    const passRateDisplay = passRate % 1 === 0 ? `${passRate}%` : `${passRate.toFixed(1)}%`;
+
+    const zeroCount = group.students.filter(s => {
+      const avg = computeStudentRawAverage(s, group.tasks, treatAsZero);
+      return avg === 0;
+    }).length;
+
+    // Prefill modal fields
+    if (el.docxModalGroupName) el.docxModalGroupName.textContent = group.name;
+    if (el.docxModalGroupMeta) el.docxModalGroupMeta.textContent = `${totalStudents} alumnos • ${group.tasks.length} actividades evaluadas`;
+
+    if (el.inputDocxPassRate) el.inputDocxPassRate.value = passRateDisplay;
+    if (el.tagDocxPassRate) el.tagDocxPassRate.textContent = `${passedCount} de ${totalStudents}`;
+    if (el.hintDocxPassRate) el.hintDocxPassRate.textContent = `Acreditados con calificación ≥ ${minPass.toFixed(1)}`;
+
+    if (el.inputDocxGroupAvg) el.inputDocxGroupAvg.value = shouldRound ? roundedGroupAvg.toFixed(1) : roundedGroupAvg.toFixed(2);
+    if (el.tagDocxGroupAvg) el.tagDocxGroupAvg.textContent = shouldRound ? 'Redondeado CBTis' : 'Sin redondear';
+    if (el.hintDocxGroupAvg) el.hintDocxGroupAvg.textContent = `Promedio general del grupo (${shouldRound ? 'enteros/oficial' : 'decimales'})`;
+
+    if (el.inputDocxDropouts) el.inputDocxDropouts.value = zeroCount;
+    if (el.inputDocxAttendance && !el.inputDocxAttendance.value) el.inputDocxAttendance.value = '';
+
+    // Header info (stored in localStorage)
+    if (el.inputDocxTeacherName) el.inputDocxTeacherName.value = localStorage.getItem('gradeflow_docx_teacher') || '';
+    if (el.inputDocxAcademy) el.inputDocxAcademy.value = localStorage.getItem('gradeflow_docx_academy') || '';
+    if (el.inputDocxSubject) el.inputDocxSubject.value = group.name;
+
+    const todayStr = new Intl.DateTimeFormat('es-MX', { dateStyle: 'long' }).format(new Date());
+    if (el.inputDocxMeetingDate) el.inputDocxMeetingDate.value = todayStr;
+
+    // Reset column selection to 1 (Mes inmediato anterior)
+    const radio1 = document.querySelector('input[name="docxColumnTarget"][value="1"]');
+    if (radio1) {
+      radio1.checked = true;
+      document.querySelectorAll('.column-pill').forEach(pill => pill.classList.remove('active'));
+      const activeLabel = radio1.closest('.column-pill');
+      if (activeLabel) activeLabel.classList.add('active');
+    }
+
+    if (el.docxModal) el.docxModal.classList.remove('hidden');
+  }
+
+  async function generateAndDownloadDocx() {
+    const group = getActiveGroup();
+    if (!group) return;
+
+    if (typeof JSZip === 'undefined') {
+      showToast('Error: Biblioteca JSZip no cargada. Revisa tu conexión.');
+      return;
+    }
+
+    const btn = el.btnGenerateDocxDownload;
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span>Generando Word...</span>';
+    }
+
+    try {
+      // Save preferences to localStorage
+      if (el.inputDocxTeacherName) localStorage.setItem('gradeflow_docx_teacher', el.inputDocxTeacherName.value.trim());
+      if (el.inputDocxAcademy) localStorage.setItem('gradeflow_docx_academy', el.inputDocxAcademy.value.trim());
+
+      // Read form data
+      const selectedRadio = document.querySelector('input[name="docxColumnTarget"]:checked');
+      const targetColIdx = selectedRadio ? parseInt(selectedRadio.value, 10) : 1; // 1: Mes anterior, 2: Hace dos meses, 3: Acumulado
+
+      const passRateVal = el.inputDocxPassRate ? el.inputDocxPassRate.value.trim() : '';
+      const groupAvgVal = el.inputDocxGroupAvg ? el.inputDocxGroupAvg.value.trim() : '';
+      const attendanceVal = el.inputDocxAttendance ? el.inputDocxAttendance.value.trim() : '';
+      const dropoutsVal = el.inputDocxDropouts ? el.inputDocxDropouts.value.trim() : '';
+
+      const teacherName = el.inputDocxTeacherName ? el.inputDocxTeacherName.value.trim() : '';
+      const subject = el.inputDocxSubject ? el.inputDocxSubject.value.trim() : group.name;
+      const academy = el.inputDocxAcademy ? el.inputDocxAcademy.value.trim() : '';
+      const meetingDate = el.inputDocxMeetingDate ? el.inputDocxMeetingDate.value.trim() : '';
+
+      // Load base template
+      let zip;
+      if (window.DOCX_TEMPLATE_BASE64) {
+        zip = await JSZip.loadAsync(window.DOCX_TEMPLATE_BASE64, { base64: true });
+      } else {
+        const response = await fetch('Registro de Logros Docentes Individuales.docx');
+        const arrayBuf = await response.arrayBuffer();
+        zip = await JSZip.loadAsync(arrayBuf);
+      }
+
+      // Read word/document.xml
+      const xmlFile = zip.file('word/document.xml');
+      if (!xmlFile) {
+        throw new Error('El archivo .docx no contiene word/document.xml');
+      }
+
+      const xmlText = await xmlFile.async('text');
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xmlText, 'application/xml');
+
+      const wNs = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+      const tblList = xmlDoc.getElementsByTagNameNS(wNs, 'tbl');
+      if (!tblList || tblList.length === 0) {
+        throw new Error('No se encontró la tabla en la plantilla .docx');
+      }
+
+      const tbl = tblList[0];
+      const rows = tbl.getElementsByTagNameNS(wNs, 'tr');
+
+      // Update Row 0 (Header: Docente, Academia, Materia, Fecha)
+      if (rows.length > 0) {
+        updateDocxHeaderRow(xmlDoc, rows[0], { teacherName, subject, academy, meetingDate });
+      }
+
+      // Update Target Column in Rows 5-8
+      // Row 5: % de aprobación
+      if (rows.length > 5 && passRateVal) {
+        const cells = rows[5].getElementsByTagNameNS(wNs, 'tc');
+        if (cells.length > targetColIdx) {
+          setTableCellText(xmlDoc, cells[targetColIdx], passRateVal, true);
+        }
+      }
+
+      // Row 6: Promedio general de calificaciones
+      if (rows.length > 6 && groupAvgVal) {
+        const cells = rows[6].getElementsByTagNameNS(wNs, 'tc');
+        if (cells.length > targetColIdx) {
+          setTableCellText(xmlDoc, cells[targetColIdx], groupAvgVal, true);
+        }
+      }
+
+      // Row 7: % de asistencia a clases (si se proporcionó)
+      if (rows.length > 7 && attendanceVal) {
+        const cells = rows[7].getElementsByTagNameNS(wNs, 'tc');
+        if (cells.length > targetColIdx) {
+          setTableCellText(xmlDoc, cells[targetColIdx], attendanceVal, true);
+        }
+      }
+
+      // Row 8: # de alumnos que se dieron de baja (si se proporcionó)
+      if (rows.length > 8 && dropoutsVal) {
+        const cells = rows[8].getElementsByTagNameNS(wNs, 'tc');
+        if (cells.length > targetColIdx) {
+          setTableCellText(xmlDoc, cells[targetColIdx], dropoutsVal, true);
+        }
+      }
+
+      // Serialize modified XML
+      const serializer = new XMLSerializer();
+      const newXmlText = serializer.serializeToString(xmlDoc);
+      zip.file('word/document.xml', newXmlText);
+
+      // Generate docx Blob
+      const blob = await zip.generateAsync({
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      });
+
+      // Download file
+      const cleanName = group.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const filename = `Registro_de_Logros_${cleanName}.docx`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      if (el.docxModal) el.docxModal.classList.add('hidden');
+      showToast(`¡Documento "${filename}" descargado con éxito!`);
+    } catch (err) {
+      console.error('Error generando documento .docx:', err);
+      showToast('Ocurrió un error al generar el archivo Word: ' + err.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          <span>Descargar Word Rellenado (.docx)</span>`;
+      }
+    }
+  }
+
+  function updateDocxHeaderRow(xmlDoc, trElement, { teacherName, subject, academy, meetingDate }) {
+    const wNs = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    const paragraphs = trElement.getElementsByTagNameNS(wNs, 'p');
+    if (paragraphs.length >= 3) {
+      // P0: Academia y Fecha
+      if (academy || meetingDate) {
+        const acadStr = academy ? `Academia de: ${academy}` : 'Academia de:';
+        const dateStr = meetingDate ? `Fecha de la reunión: ${meetingDate}` : 'Fecha de la reunión:';
+        const combined = `${acadStr.padEnd(50, ' ')}   ${dateStr}`;
+        setParagraphSingleText(xmlDoc, paragraphs[0], combined, false);
+      }
+      // P1: Nombre del docente
+      if (teacherName) {
+        setParagraphSingleText(xmlDoc, paragraphs[1], `Nombre del docente: ${teacherName}`, false);
+      }
+      // P2: Materias del área que imparte
+      if (subject) {
+        setParagraphSingleText(xmlDoc, paragraphs[2], `Materias del área que imparte: ${subject}`, false);
+      }
+    }
+  }
+
+  function setTableCellText(xmlDoc, tcElement, text, isCentered = true) {
+    const wNs = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    let p = tcElement.getElementsByTagNameNS(wNs, 'p')[0];
+    if (!p) {
+      p = xmlDoc.createElementNS(wNs, 'w:p');
+      tcElement.appendChild(p);
+    }
+    setParagraphSingleText(xmlDoc, p, text, isCentered);
+  }
+
+  function setParagraphSingleText(xmlDoc, pElement, text, isCentered = false) {
+    const wNs = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    let pPr = pElement.getElementsByTagNameNS(wNs, 'pPr')[0];
+    if (!pPr) {
+      pPr = xmlDoc.createElementNS(wNs, 'w:pPr');
+      pElement.insertBefore(pPr, pElement.firstChild);
+    }
+
+    if (isCentered) {
+      let jc = pPr.getElementsByTagNameNS(wNs, 'jc')[0];
+      if (!jc) {
+        jc = xmlDoc.createElementNS(wNs, 'w:jc');
+        pPr.appendChild(jc);
+      }
+      jc.setAttributeNS(wNs, 'w:val', 'center');
+    }
+
+    // Remove existing w:r runs
+    const runs = Array.from(pElement.getElementsByTagNameNS(wNs, 'r'));
+    runs.forEach(r => pElement.removeChild(r));
+
+    if (!text && text !== 0) return;
+
+    const r = xmlDoc.createElementNS(wNs, 'w:r');
+    const rPr = xmlDoc.createElementNS(wNs, 'w:rPr');
+
+    const rFonts = xmlDoc.createElementNS(wNs, 'w:rFonts');
+    rFonts.setAttributeNS(wNs, 'w:ascii', 'Calibri');
+    rFonts.setAttributeNS(wNs, 'w:hAnsi', 'Calibri');
+    rPr.appendChild(rFonts);
+
+    const b = xmlDoc.createElementNS(wNs, 'w:b');
+    rPr.appendChild(b);
+
+    const lang = xmlDoc.createElementNS(wNs, 'w:lang');
+    lang.setAttributeNS(wNs, 'w:val', 'es-MX');
+    rPr.appendChild(lang);
+
+    r.appendChild(rPr);
+
+    const t = xmlDoc.createElementNS(wNs, 'w:t');
+    t.setAttribute('xml:space', 'preserve');
+    t.textContent = String(text);
+    r.appendChild(t);
+
+    pElement.appendChild(r);
   }
 
   /* ==========================================================================
