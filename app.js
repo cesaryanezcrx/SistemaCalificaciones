@@ -1315,6 +1315,17 @@
     }
 
     // Column radio selector pills
+    document.querySelectorAll('.column-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        const radio = pill.querySelector('input[name="docxColumnTarget"]');
+        if (radio) {
+          radio.checked = true;
+          document.querySelectorAll('.column-pill').forEach(p => p.classList.remove('active'));
+          pill.classList.add('active');
+        }
+      });
+    });
+
     document.querySelectorAll('input[name="docxColumnTarget"]').forEach(radio => {
       radio.addEventListener('change', () => {
         document.querySelectorAll('.column-pill').forEach(pill => pill.classList.remove('active'));
@@ -1630,36 +1641,98 @@
         updateDocxHeaderRow(xmlDoc, rows[0], { teacherName, subject, academy, meetingDate });
       }
 
-      // Update Target Column in Rows 5-8
-      // Row 5: % de aprobación
-      if (rows.length > 5 && passRateVal) {
-        const cells = rows[5].getElementsByTagNameNS(wNs, 'tc');
-        if (cells.length > targetColIdx) {
-          setTableCellText(xmlDoc, cells[targetColIdx], passRateVal, true);
+      // Dynamically locate table rows by analyzing their first cell text
+      let rowHeaderCols = null;
+      let rowPassRate = null;
+      let rowGroupAvg = null;
+      let rowAttendance = null;
+      let rowDropouts = null;
+
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        const rCells = r.getElementsByTagNameNS(wNs, 'tc');
+        if (rCells.length < 2) continue; // Skip single-cell rows
+
+        const cell0Text = (rCells[0].textContent || '').toLowerCase().trim();
+        if (cell0Text.includes('aprobaci')) {
+          rowPassRate = r;
+        } else if (cell0Text.includes('promedio')) {
+          rowGroupAvg = r;
+        } else if (cell0Text.includes('asistencia')) {
+          rowAttendance = r;
+        } else if (cell0Text.includes('baja') || cell0Text.includes('asistir')) {
+          rowDropouts = r;
+        } else if (rCells.length >= 4 && !rowHeaderCols) {
+          rowHeaderCols = r;
         }
       }
 
-      // Row 6: Promedio general de calificaciones
-      if (rows.length > 6 && groupAvgVal) {
-        const cells = rows[6].getElementsByTagNameNS(wNs, 'tc');
-        if (cells.length > targetColIdx) {
-          setTableCellText(xmlDoc, cells[targetColIdx], groupAvgVal, true);
+      // Safe fallback to default row index if needed
+      if (!rowPassRate && rows.length > 5) rowPassRate = rows[5];
+      if (!rowGroupAvg && rows.length > 6) rowGroupAvg = rows[6];
+      if (!rowAttendance && rows.length > 7) rowAttendance = rows[7];
+      if (!rowDropouts && rows.length > 8) rowDropouts = rows[8];
+      if (!rowHeaderCols && rows.length > 4) rowHeaderCols = rows[4];
+
+      // Verify the column index against header row text:
+      // Column 1 -> 'Mes inmediato anterior'
+      // Column 2 -> 'Hace dos meses anteriores'
+      // Column 3 -> 'Acumulado del semestre'
+      let verifiedColIdx = targetColIdx;
+      if (rowHeaderCols) {
+        const hCells = rowHeaderCols.getElementsByTagNameNS(wNs, 'tc');
+        const keywords = {
+          1: ['inmediato', 'anterior'],
+          2: ['dos', 'meses'],
+          3: ['acumulado', 'semestre']
+        };
+        const targetKeywords = keywords[targetColIdx] || [];
+        for (let c = 1; c < hCells.length; c++) {
+          const hText = (hCells[c].textContent || '').toLowerCase();
+          if (targetKeywords.some(kw => hText.includes(kw))) {
+            verifiedColIdx = c;
+            break;
+          }
         }
       }
 
-      // Row 7: % de asistencia a clases (si se proporcionó)
-      if (rows.length > 7 && attendanceVal) {
-        const cells = rows[7].getElementsByTagNameNS(wNs, 'tc');
-        if (cells.length > targetColIdx) {
-          setTableCellText(xmlDoc, cells[targetColIdx], attendanceVal, true);
+      const colNames = {
+        1: 'Mes inmediato anterior',
+        2: 'Hace dos meses anteriores',
+        3: 'Acumulado del semestre'
+      };
+      const colLabel = colNames[verifiedColIdx] || `Columna ${verifiedColIdx}`;
+
+      // Update Verified Target Column in each respective row
+      // Row: % de aprobación
+      if (rowPassRate && passRateVal) {
+        const cells = rowPassRate.getElementsByTagNameNS(wNs, 'tc');
+        if (cells.length > verifiedColIdx) {
+          setTableCellText(xmlDoc, cells[verifiedColIdx], passRateVal, true);
         }
       }
 
-      // Row 8: # de alumnos que se dieron de baja (si se proporcionó)
-      if (rows.length > 8 && dropoutsVal) {
-        const cells = rows[8].getElementsByTagNameNS(wNs, 'tc');
-        if (cells.length > targetColIdx) {
-          setTableCellText(xmlDoc, cells[targetColIdx], dropoutsVal, true);
+      // Row: Promedio general de calificaciones
+      if (rowGroupAvg && groupAvgVal) {
+        const cells = rowGroupAvg.getElementsByTagNameNS(wNs, 'tc');
+        if (cells.length > verifiedColIdx) {
+          setTableCellText(xmlDoc, cells[verifiedColIdx], groupAvgVal, true);
+        }
+      }
+
+      // Row: % de asistencia a clases (si se proporcionó)
+      if (rowAttendance && attendanceVal) {
+        const cells = rowAttendance.getElementsByTagNameNS(wNs, 'tc');
+        if (cells.length > verifiedColIdx) {
+          setTableCellText(xmlDoc, cells[verifiedColIdx], attendanceVal, true);
+        }
+      }
+
+      // Row: # de alumnos que se dieron de baja o dejaron de asistir (si se proporcionó)
+      if (rowDropouts && dropoutsVal) {
+        const cells = rowDropouts.getElementsByTagNameNS(wNs, 'tc');
+        if (cells.length > verifiedColIdx) {
+          setTableCellText(xmlDoc, cells[verifiedColIdx], dropoutsVal, true);
         }
       }
 
@@ -1687,7 +1760,7 @@
       URL.revokeObjectURL(url);
 
       if (el.docxModal) el.docxModal.classList.add('hidden');
-      showToast(`¡Documento "${filename}" descargado con éxito!`);
+      showToast(`¡Documento guardado en "${colLabel}" y descargado con éxito!`);
     } catch (err) {
       console.error('Error generando documento .docx:', err);
       showToast('Ocurrió un error al generar el archivo Word: ' + err.message);
